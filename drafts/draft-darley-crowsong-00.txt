@@ -1,0 +1,1256 @@
+Internet-Draft                                                 T. Darley
+Intended status: Informational                          Proper Tools SRL
+Expires: 2026-10-01                                        1 April 2026
+
+
+           The Crowsong Suite
+  A Modular Architecture for Communications Under Degraded,
+        Disrupted, and Disconnected Conditions
+
+        draft-darley-crowsong-00
+
+
+Dedication
+
+   This document is dedicated to the memory of Felix "FX" Lindner
+   (1975-2026), who understood that the most important infrastructure
+   is the kind you build before you need it, and who demonstrated
+   this understanding in everything he made.
+
+
+Abstract
+
+   Existing resilient communications architectures generally assume
+   that some digital transport remains available.  This document
+   proposes a modular architecture for conditions in which IP
+   connectivity, and potentially binary-capable transport itself,
+   may be absent.
+
+   The Crowsong Suite (RSS) composes five independently
+   deployable layers spanning physical transport classification,
+   human-legible encoding, delay-tolerant routing, threshold trust,
+   and signed content continuity.  The stack builds on existing
+   work, including RFC 4838 for routing, and composes established
+   primitives such as Ed25519 and Shamir secret sharing.
+
+   The defining requirement of the stack is graceful degradation to
+   human legibility at every layer.  Messages MUST remain
+   interpretable, verifiable, and transmissible even when reduced to
+   manual transcription over non-binary channels.
+
+   This property is not a fallback.  It is a design constraint.
+
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current
+   Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six
+   months and may be updated, replaced, or obsoleted by other
+   documents at any time.  It is inappropriate to use Internet-Drafts
+   as reference documents or to cite them other than as "work in
+   progress."
+
+   This Internet-Draft will expire on 1 October 2026.
+
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.
+
+
+Table of Contents
+
+   1.   Introduction
+     1.1.  Motivation
+     1.2.  Design Philosophy
+     1.3.  Scope and Non-Goals
+     1.4.  Terminology
+     1.5.  Relationship to Existing Work
+   2.   Stack Architecture Overview
+   3.   L1 -- Physical Transport Layer
+     3.1.  Channel Classification
+     3.2.  Channel Properties
+     3.3.  Channel Selection Guidance
+   4.   L2 -- Encoding Layer: Fox Decimal Script (FDS)
+     4.1.  Motivation
+     4.2.  Encoding Specification (UCS-DEC)
+     4.3.  FDS-FRAME: Framing and Error Detection
+     4.4.  Authentication Extension
+     4.5.  Binary Payload Encoding
+     4.6.  Transport Compatibility Matrix
+     4.7.  Reference Implementation
+   5.   L3 -- Routing Layer: Delay-Tolerant Networking
+     5.1.  Relationship to RFC 4838
+     5.2.  DTN-BUNDLE-FDS: Bundles over Non-Binary Channels
+     5.3.  Node Identity
+     5.4.  Routing Strategies
+   6.   L4 -- Trust Layer
+     6.1.  Key Primitives
+     6.2.  SHARD-BUNDLE: Shamir Distribution over FDS Channels
+     6.3.  MIRROR-ATTESTATION: M-of-N Content Verification
+     6.4.  Key Custody Across Physical Media
+   7.   L5 -- Content Layer: Meridian Protocol
+     7.1.  Relationship to draft-darley-meridian-protocol-01
+     7.2.  Succession Packet
+     7.3.  The Time Capsule as a Protocol Object
+   8.   Deployment Scenarios
+     8.1.  Normal Operations (full IP stack available)
+     8.2.  Degraded Operations (intermittent connectivity)
+     8.3.  Disrupted Operations (DTN-only, no IP)
+     8.4.  Post-Disruption Recovery (human relay, physical media)
+     8.5.  Air-Gapped Environments
+     8.6.  Extreme Latency: Physical Archival
+   9.   Security Considerations
+        The stack separates error detection, authenticity, and
+   confidentiality; each MUST be considered independently.  FDS
+   encoding provides error detection only.  Ed25519 signatures
+   provide authenticity.  Confidentiality requires an additional
+   encryption layer and is outside the scope of this document.
+
+9.1.  Channel-Specific Threats
+     9.2.  Key Management at Reduced Capability
+     9.3.  Human-Relay Trust
+     9.4.  Replay and Sequencing
+   10.  IANA Considerations
+   11.  References
+     11.1. Normative References
+     11.2. Informative References
+   12.  Acknowledgements
+   13.  Author's Address
+
+
+1.  Introduction
+
+1.1.  Motivation
+
+   The history of communications infrastructure is punctuated by
+   failure.  Network partitions, power outages, physical destruction,
+   economic collapse, and deliberate interdiction have repeatedly
+   reduced or eliminated digital connectivity in environments where
+   it was previously assumed.
+
+   Existing resilient communications protocols address degraded
+   conditions: reduced bandwidth, increased latency, or intermittent
+   connectivity.  RFC 4838 [RFC4838] defines Delay-Tolerant
+   Networking (DTN) for precisely this environment.
+
+   This document addresses a more severe condition: the absence of
+   any reliable binary-capable transport.  When the only available
+   media are text-constrained, symbol-constrained, or human-mediated
+   channels, existing protocol guidance is limited.
+
+   The Crowsong Suite defines an architecture that spans
+   this gap, extending communications continuity from degraded
+   digital transport down to fully human-relayed transmission.
+
+   The Crowsong Suite fills this gap by specifying a layered
+   architecture whose defining property is graceful degradation to
+   human legibility.  Every layer of the stack can be operated, at
+   reduced capability, by a human without software.  This is not a
+   theoretical property.  It has operational consequences at every
+   layer of the design.
+
+   The immediate motivation for this work is the Aeolian Layer
+   [AEOLIAN] -- a kite-borne delay-tolerant mesh network designed
+   for communications continuity under infrastructure failure -- but
+   the stack is general-purpose and applicable to any environment
+   where communications must survive the loss of IP infrastructure.
+
+1.2.  Design Philosophy
+
+   The Crowsong Suite is designed around six principles:
+
+   Composability.  Each layer is independently deployable and
+      useful.  A partial deployment is valid.  Layers do not require
+      the presence of layers above or below them.
+
+   Graceful degradation to human legibility.  Every layer must be
+      operable, at reduced capability, by a human without software.
+      This is a hard requirement, not a stretch goal.
+
+   Physical-layer independence.  The encoding and routing layers
+      must not assume any particular physical medium.  The stack
+      must operate over LoRa, Morse, fax, acoustic, optical, print,
+      and human transcription without modification.
+
+   Composability with existing standards.  The stack does not
+      redefine cryptography, content addressing, archive formats,
+      or feed syndication.  It composes existing standards and defers
+      to them: RFC 4838 for routing, Ed25519 for signing,
+      Shamir [SHAMIR] for secret distribution, and the Meridian
+      Protocol [MERIDIAN] for content sovereignty.
+
+   Explicit trust.  Trust relationships are named, bounded, and
+      cryptographically verifiable.  The stack does not rely on
+      implicit trust in infrastructure.
+
+   Longitudinal integrity.  The stack must support messages with
+      delivery latencies ranging from milliseconds to decades.  A
+      message sealed in a physical archive and recovered fifty years
+      later is a valid message.  The stack must be able to verify
+      its integrity.
+
+1.3.  Scope and Non-Goals
+
+   This document specifies the architecture and interfaces of the
+   Crowsong Suite.  Detailed specifications of individual
+   components are provided at the level necessary to ensure
+   interoperability; some components (particularly FDS) are fully
+   specified here, while others (DTN-BUNDLE-FDS, SHARD-BUNDLE)
+   are specified at the interface level with detailed wire formats
+   deferred to companion documents.
+
+   This document does not specify:
+
+   *  Physical layer protocols or hardware (these are inputs to L1,
+      not outputs of this document)
+
+   *  Key generation procedures (authors SHOULD follow applicable
+      best practices for Ed25519 key generation and storage)
+
+   *  Legal or jurisdictional considerations arising from the use
+      of cryptography or the transmission of content across borders
+
+   *  Mechanisms for resolving disputes between parties operating
+      components of the stack
+
+1.4.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+   "MAY", and "OPTIONAL" in this document are to be interpreted as
+   described in BCP 14 [RFC2119] [RFC8174] when, and only when,
+   they appear in all capitals.
+
+   The following terms are used throughout this document:
+
+   Channel:  A physical or logical medium capable of carrying
+      discrete symbols between two or more parties.  Channels are
+      classified in Section 3.1.
+
+   Bundle:  A self-contained unit of data including payload,
+      metadata, and sufficient context for delivery.  The term
+      is used consistently with RFC 4838.
+
+   FDS Frame:  A bundle encoded using Fox Decimal Script and
+      wrapped in the framing structure defined in Section 4.3.
+
+   Shard:  A fragment of a secret produced by Shamir secret
+      sharing [SHAMIR], such that a threshold number of shards
+      are required to reconstruct the secret.
+
+   Node:  A participant in the routing layer, identified by a
+      persistent signature.  A node may be a software process,
+      a hardware device, a human operator, or a physical archive.
+
+   Extreme Latency Node:  A node whose delivery latency is
+      measured in months, years, or decades.  A buried physical
+      archive is an extreme latency node.
+
+   Human Relay:  A person who receives, transcribes, and
+      retransmits a message.  Human relays are valid participants
+      in the routing layer.
+
+   Operator:  A person or organisation responsible for operating
+      one or more components of the stack.
+
+1.5.  Relationship to Existing Work
+
+   RFC 4838 [RFC4838] defines the DTN architecture and the Bundle
+   Protocol.  The Crowsong Suite extends DTN to non-binary
+   channels by interposing the FDS encoding layer between the
+   Bundle Protocol and physical transports that cannot carry binary
+   data.  RFC 4838 is a normative dependency of L3.
+
+   The Meridian Protocol [MERIDIAN] defines a signed site manifest
+   format, delta-synchronization mechanism, and DNS failover record
+   type for web content preservation.  Meridian is composed at L5
+   of the Crowsong Suite.  The stack's trust and encoding
+   layers provide Meridian with distribution mechanisms operable
+   under conditions where DNS and HTTP are unavailable.
+
+   Shamir Secret Sharing [SHAMIR] is composed at L4 to provide
+   threshold key custody and content attestation.  The credmgr
+   reference implementation [CREDMGR] demonstrates the operational
+   pattern that L4 formalises.
+
+   The L2 encoding layer (Fox Decimal Script) is fully specified
+   in companion document draft-darley-fds-00 [FDS].  The L4 trust
+   primitives are specified in companion document
+   draft-darley-shard-bundle-00 [SHARD].  This document specifies
+   the architecture and layer interfaces; companion documents
+   provide wire-format specifications for individual layers.
+
+   DNSSEC [RFC4033] and Ed25519 [RFC8032] provide the cryptographic
+   primitives used at L4 and L5.
+
+   The Delay-Tolerant Networking Research Group (DTNRG) work on
+   Licklider Transmission Protocol [RFC5326] and related protocols
+   are informative references for L3 implementors.
+
+
+2.  Stack Architecture Overview
+
+   The Crowsong Suite comprises five layers:
+
+      ┌────────────────────────────────────────────────────────┐
+      │  L5  CONTENT LAYER                                     │
+      │      Meridian Protocol                                 │
+      │      Signed manifests, asset graphs, succession terms  │
+      │      Author sovereignty, URL continuity                │
+      ├────────────────────────────────────────────────────────┤
+      │  L4  TRUST LAYER                                       │
+      │      Shamir secret sharing, Ed25519 signing            │
+      │      Multi-party attestation, key custody              │
+      │      SHARD-BUNDLE, MIRROR-ATTESTATION                  │
+      ├────────────────────────────────────────────────────────┤
+      │  L3  ROUTING LAYER                                     │
+      │      Delay-Tolerant Networking (RFC 4838)              │
+      │      Store-and-forward, bundle protocol                │
+      │      DTN-BUNDLE-FDS for non-binary channels            │
+      │      Node identity, opportunistic routing              │
+      ├────────────────────────────────────────────────────────┤
+      │  L2  ENCODING LAYER                                    │
+      │      Fox Decimal Script (FDS / UCS-DEC)                │
+      │      Physical-layer agnostic serialisation             │
+      │      Human-transcribable, machine-verifiable           │
+      │      FDS-FRAME with error detection and auth           │
+      ├────────────────────────────────────────────────────────┤
+      │  L1  PHYSICAL TRANSPORT LAYER (pluggable)              │
+      │  LoRa mesh │ Morse │ Fax │ QR │ Acoustic │ Optical     │
+      │  Print/OCR │ USB sneakernet │ HF shortwave             │
+      │  Kite-borne RF │ Human courier │ Physical archive      │
+      └────────────────────────────────────────────────────────┘
+
+   L2 provides a transport-neutral, human-legible serialization
+   substrate; it does not redefine routing or trust semantics.
+
+   Each layer presents a defined interface to the layer above and
+   below it.  The interface between L1 and L2 is a stream of
+   discrete symbols (characters, digits, or equivalent).  The
+   interface between L2 and L3 is a sequence of Unicode code
+   points.  The interface between L3 and L4 is a verified bundle.
+   The interface between L4 and L5 is an authenticated, integrity-
+   checked payload with verified key provenance.
+
+   A partial deployment omitting one or more layers is valid.
+   A deployment of L2 over L1 with no L3 routing is a valid and
+   useful configuration for point-to-point messaging over non-
+   binary channels.  A deployment of L4 with no L3 (shard
+   distribution via physical courier, with no DTN routing) is
+   valid for key custody over physical media.
+
+   The stack deliberately mirrors the structure of the OSI reference
+   model without claiming equivalence to it.  The numbering is
+   chosen for conceptual clarity, not for compatibility with
+   existing layer numbering conventions.
+
+
+3.  L1 -- Physical Transport Layer
+
+3.1.  Channel Classification
+
+   The Crowsong Suite classifies physical channels into
+   four categories based on their symbol-carrying capability:
+
+   Class A -- Binary-capable channels.  Channels that can carry
+      arbitrary binary data.  IP networks, LoRa, AX.25 packet
+      radio, Bluetooth, serial links.  These channels can carry
+      DTN bundles directly.  FDS encoding at L2 is not required
+      for Class A channels but MAY be used for interoperability
+      with systems that require human-legible encoding.
+
+   Class B -- Text-capable channels.  Channels that can carry
+      printable ASCII or Unicode text but not arbitrary binary.
+      Fax, email systems with encoding constraints, printed page,
+      OCR pipelines, SMS.  FDS encoding is REQUIRED for L3
+      bundles carried over Class B channels.
+
+   Class C -- Symbol-capable channels.  Channels that can carry
+      a finite alphabet of discrete symbols but not full text.
+      Morse code, flag semaphore, signal lamps, blink patterns.
+      FDS encoding using a subset of the decimal digit alphabet
+      is REQUIRED for Class C channels.  Mapping from FDS digits
+      to channel symbols is channel-specific and outside the
+      scope of this document.
+
+   Class D -- Human-relay channels.  Channels in which symbol
+      production, error correction, and forwarding decisions are
+      materially coupled to human cognition.  No assumptions about
+      fidelity or bandwidth are made.  FDS encoding is REQUIRED.
+      Messages SHOULD be structured for maximum transcription
+      accuracy (see Section 4.2).
+
+3.2.  Channel Properties
+
+   The following properties are relevant to channel selection and
+   routing decisions at L3:
+
+   Bandwidth:  Symbols per unit time.  Ranges from bits per
+      second (LoRa at low spreading factor) to words per minute
+      (human transcription) to pages per day (physical courier).
+
+   Latency:  Time from transmission to reception.  Ranges from
+      milliseconds (LoRa) to years (physical archive).
+
+   Error rate:  Probability of symbol corruption in transit.
+      FDS encoding provides error detection; forward error
+      correction is outside the scope of this document but
+      SHOULD be applied for channels with high error rates.
+
+   Directionality:  Whether the channel supports bidirectional
+      communication.  Some channels (broadcast RF, printed page,
+      physical archive) are unidirectional.  Routing at L3 MUST
+      handle unidirectional channels.
+
+   Legibility:  Whether a human can read the channel output
+      without software.  All Class B, C, and D channels are
+      legible by definition.  Legibility is a secondary property
+      of Class A channels when FDS encoding is applied.
+
+   Durability:  Whether the channel output persists after
+      transmission.  Printed pages and physical archives are
+      durable.  RF transmissions are not.  Durable channels
+      support extreme-latency delivery.
+
+3.3.  Channel Selection Guidance
+
+   Operators SHOULD select channels based on the following
+   priority order when multiple channels are available:
+
+   1.  Class A channels with DTN support (lowest latency, highest
+       bandwidth, no encoding overhead)
+
+   2.  Class A channels without DTN support (requires bundle
+       framing but no encoding)
+
+   3.  Class B channels (requires FDS encoding; latency and
+       bandwidth reduced)
+
+   4.  Class C channels (requires FDS encoding and symbol
+       mapping; significant bandwidth reduction)
+
+   5.  Class D channels (human relay; treat as Class C with
+       additional error probability)
+
+   6.  Physical archive (extreme latency; treat as Class D
+       with delivery latency measured in years to decades)
+
+   In disrupted environments, lower-priority channels MUST be
+   used when higher-priority channels are unavailable.  The
+   stack is designed for this scenario.
+
+
+4.  L2 -- Encoding Layer: Fox Decimal Script (FDS)
+
+4.1.  Motivation
+
+   Binary encodings optimise for bandwidth.  FDS optimises for
+   survivability: the ability of a message to traverse any channel
+   that can carry decimal digits, to be read and transcribed by any
+   literate person, and to be verified without software.
+
+   FDS encodes Unicode text as zero-padded decimal integers, one
+   per Unicode code point, arranged in fixed-width fields and
+   optionally formatted in columns.  The encoding is stateless,
+   deterministic, and trivially reversible.  A message encoded in
+   FDS can be decoded by any person with a Unicode code point table
+   and the patience to perform integer lookup.
+
+   The informal name Fox Decimal Script honours the kitsune --
+   the fox of Japanese folklore, guardian of thresholds and
+   messenger between worlds.  The formal designation is UCS-DEC
+   (Unicode Character Set, Decimal encoding).
+
+4.2.  Encoding Specification (UCS-DEC)
+
+   Input:  Arbitrary Unicode text, normalised to NFC [UAX15]
+      before encoding.  Implementors SHOULD normalise input;
+      implementations MUST document whether they normalise.
+
+   Transformation:  Each character is converted as follows:
+
+      codepoint = ord(character)
+      encoded   = zero_pad(decimal(codepoint), width)
+
+   Field width:  Default 5 digits (range 00000-99999).  This
+      covers Unicode code points U+0000 through U+1869F,
+      encompassing the Basic Multilingual Plane and the majority
+      of supplementary planes in common use.
+
+      For content requiring code points above U+1869F, a 7-digit
+      extended field width (0000000-1114111) MUST be used.
+      The field width MUST be declared in the FDS-FRAME header
+      (Section 4.3).  Mixing field widths within a single frame
+      is NOT RECOMMENDED.
+
+   Tokenisation:  Encoded values are separated by single spaces.
+      No additional delimiters are used.
+
+   Column formatting:  Values MAY be arranged in columns for
+      human legibility.  The default column width is 6 values
+      per row (COL/6).  This default is not arbitrary: six values
+      per row produces rows of consistent visual length, aligns
+      with common line-width constraints on Class B and C
+      channels, and produces a visual rhythm that aids human
+      verification.
+
+      Column width is declared in the FDS-FRAME header and MAY
+      be set to any positive integer or to 0 (no column
+      formatting).
+
+   Padding:  Trailing null values (00000) MAY be appended to
+      complete the final row to full column width.  Null values
+      MUST be skipped during decoding unless the --keep-null
+      flag is specified.  Padding semantics: null represents
+      no-op.  The presence of padding MUST be declared in the
+      frame header.
+
+   Example encoding (COL/6, field width 5):
+
+      Input: "Hello"
+
+      H  = 72  → 00072
+      e  = 101 → 00101
+      l  = 108 → 00108
+      l  = 108 → 00108
+      o  = 111 → 00111
+      LF = 10  → 00010
+
+      Encoded:
+      00072  00101  00108  00108  00111  00010
+
+4.3.  FDS-FRAME: Framing and Error Detection
+
+   An FDS-FRAME wraps an encoded payload with a header providing
+   encoding parameters and a trailer providing integrity
+   verification.  FDS-FRAME is OPTIONAL for point-to-point use
+   but REQUIRED when carrying DTN bundles at L3 or trust
+   primitives at L4.
+
+   CRC-32 provides detection of accidental transmission errors.
+   Cryptographic authenticity MUST be provided separately via
+   signatures (Section 4.4).
+
+   Frame structure:
+
+      HEADER
+      ------
+      A single line of the form:
+
+         ENC: UCS · DEC · COL/<n> · PAD/<pad> · WIDTH/<w>
+
+      Fields:
+         COL/<n>    Column width (default: COL/6)
+         PAD/<pad>  Padding value (default: PAD/00000)
+         WIDTH/<w>  Field width in digits (default: WIDTH/5)
+
+      Additional fields MAY be appended separated by " · ".
+      Unknown fields MUST be ignored by decoders.
+
+      PAYLOAD
+      -------
+      FDS-encoded content, formatted per the header parameters.
+
+      TRAILER
+      -------
+      A single line of the form:
+
+         <n> VALUES · CRC32:<hex> · VERIFY COUNT BEFORE USE
+
+      Where <n> is the total number of encoded values (excluding
+      padding) and <hex> is the CRC-32 [ISO3309] of the decoded
+      byte sequence.
+
+      When integrity verification fails, decoders MUST NOT use
+      the decoded content.  The canonical trailer line for a
+      frame that MUST NOT be used after integrity failure is:
+
+         IF COUNT FAILS: DESTROY IMMEDIATELY
+
+      This line SHOULD be included in frames carrying key
+      material or other sensitive content.
+
+   Example FDS-FRAME:
+
+      ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5
+      00072  00101  00108  00108  00111  00010
+      00000  00000  00000  00000  00000  00000
+      6 VALUES · CRC32:3610A686 · VERIFY COUNT BEFORE USE
+      IF COUNT FAILS: DESTROY IMMEDIATELY
+
+4.4.  Authentication Extension
+
+   FDS-FRAME MAY carry an Ed25519 [RFC8032] signature over the
+   decoded payload.  When present, the signature is encoded as
+   a base64url string in the header:
+
+      ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5
+      SIG: ED25519 · <base64url-encoded Ed25519 signature>
+
+   The signature covers the UTF-8 encoding of the decoded payload
+   (after null removal), not the FDS-encoded representation.
+   Implementations MUST verify the signature against the sender's
+   known public key before using the decoded content.
+
+   The public key MUST be distributed out-of-band or via a
+   SHARD-BUNDLE (Section 6.2).  FDS-FRAME does not specify a
+   key distribution mechanism.
+
+4.5.  Binary Payload Encoding
+
+   Binary payloads (DTN bundles, encrypted data, compressed
+   archives) MUST be base64url-encoded [RFC4648] before FDS
+   encoding.  The resulting base64url string is then encoded
+   as FDS in the normal manner.
+
+   The header MUST declare binary encoding:
+
+      ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5 · B64
+
+   Decoders MUST base64url-decode the decoded text after FDS
+   decoding when the B64 flag is present.
+
+4.6.  Transport Compatibility Matrix
+
+   Channel Class  FDS Required  Binary Payload  Notes
+   -------------  ------------  --------------  -----
+   A (binary)     OPTIONAL      Direct          FDS adds legibility
+   B (text)       REQUIRED      Via B64         Standard deployment
+   C (symbol)     REQUIRED      Via B64         Symbol mapping needed
+   D (human)      REQUIRED      NOT RECOMMENDED Avoid binary in human
+                                                relay when possible
+
+4.7.  Reference Implementation
+
+   A reference implementation of FDS encoding and decoding is
+   provided in ucs_dec_tool.py [UCSDEC].  The implementation is
+   MIT-licensed and has no external dependencies beyond the Python
+   3 standard library.
+
+   The canonical test vector is the poem "Second Law Blues"
+   [SLB], encoded as flash paper artifact SI-2084-FP-001.
+   Implementations MUST produce output consistent with this
+   artifact when encoding the canonical poem text.
+
+   Usage:
+
+      # Encode
+      echo "Signal survives." | python3 ucs_dec_tool.py --encode
+
+      # Decode
+      cat encoded.txt | python3 ucs_dec_tool.py --decode
+
+      # Verify
+      cat encoded.txt | python3 ucs_dec_tool.py --verify
+
+
+5.  L3 -- Routing Layer: Delay-Tolerant Networking
+
+5.1.  Relationship to RFC 4838
+
+   The Crowsong Suite uses the DTN architecture defined
+   in RFC 4838 [RFC4838] for L3 routing.  RFC 4838 specifies
+   store-and-forward messaging over links that may be intermittent,
+   unidirectional, or subject to very long and variable delays.
+   This is precisely the routing environment of the Resilient
+   Signal Stack.
+
+   RFC 4838 assumes that bundles can be handed to a convergence
+   layer that carries them over some physical link.  The stack
+   extends this model by specifying the FDS encoding layer as the
+   convergence layer for non-binary channels (Class B, C, and D).
+
+   The Bundle Protocol [RFC5050] and its successor [RFC9171]
+   define the wire format for DTN bundles.  These formats are
+   used without modification at L3.  When bundles are carried
+   over non-binary channels, they are encoded as binary payloads
+   per Section 4.5 before FDS encoding.
+
+5.2.  DTN-BUNDLE-FDS: Bundles over Non-Binary Channels
+
+   DTN-BUNDLE-FDS is the convergence layer adaptor that enables
+   RFC 4838/RFC 9171 bundles to be carried over Class B, C, and
+   D channels via FDS encoding.
+
+   The encapsulation procedure is:
+
+   1.  Serialise the DTN bundle per RFC 9171 (CBOR encoding).
+
+   2.  base64url-encode the serialised bundle [RFC4648].
+
+   3.  Encode the base64url string as an FDS-FRAME with the B64
+       flag set (Section 4.5).
+
+   4.  Prepend a bundle identifier header:
+
+          BUNDLE: DTN · RFC9171 · <bundle-id>
+
+       Where <bundle-id> is the source EID and creation timestamp
+       of the bundle, encoded as a human-readable string.
+
+   5.  Transmit the FDS-FRAME over the available channel.
+
+   The decapsulation procedure is the reverse.  Implementations
+   MUST verify the FDS-FRAME CRC-32 before attempting bundle
+   deserialisation.  Implementations MUST verify the bundle's
+   integrity per RFC 9171 before delivering to the application
+   layer.
+
+5.3.  Node Identity
+
+   Each node in the routing layer is identified by a persistent
+   Ed25519 public key.  The node's identity is derived from
+   its public key and does not change when the node's physical
+   location, IP address, or operator changes.
+
+   Node identities MAY be given human-readable names for
+   operational convenience (AE-047 "Sombra", AE-031 "Perrine",
+   etc.).  These names are advisory only.  The cryptographic
+   identity is authoritative.
+
+   Human relay nodes (Class D channel operators) are assigned
+   transient identities by their operating organisation and do
+   not require persistent keypairs.  Messages relayed through
+   human relays are authenticated by the originating node's
+   signature, not by the relay operator's identity.
+
+   A node whose operator has become unavailable but whose
+   identity key material remains accessible (e.g., recovered
+   via SHARD-BUNDLE per Section 6.2) remains a valid node.
+   The trust implications of operating a node under recovered
+   key material are outside the scope of this document.
+
+5.4.  Routing Strategies
+
+   L3 routing strategy is selected based on available channel
+   information and operational context:
+
+   Geographic routing:  Route bundles toward the destination's
+      known or estimated geographic location.  Appropriate when
+      node locations are known and relatively stable.
+
+   Opportunistic routing:  Route bundles to any available
+      forwarding node and rely on store-and-forward propagation
+      to deliver them toward the destination.  Appropriate when
+      node locations are unknown or unstable.
+
+   Trust-based routing:  Prefer forwarding through nodes with
+      established trust relationships (repeated successful
+      contact history).  Appropriate when node identities are
+      known and verifiable.
+
+   The routing strategy MAY change dynamically based on
+   available channel information.  Implementations SHOULD
+   support all three strategies and select among them based
+   on current network conditions.
+
+   A node that has been unreachable for an extended period but
+   whose stored bundles remain intact is NOT considered failed.
+   Bundles addressed to such a node SHOULD be retained until
+   the node's custodial time-to-live expires.
+
+
+6.  L4 -- Trust Layer
+
+6.1.  Key Primitives
+
+   These primitives are composed from existing standards; no new
+   cryptographic constructions are introduced.
+
+   The trust layer provides three primitives:
+
+   Ed25519 signing and verification [RFC8032]:  Used to
+      authenticate messages, bundles, manifests, and node
+      identities throughout the stack.  All signing in the
+      Crowsong Suite uses Ed25519.
+
+   Shamir (k,n) threshold secret sharing [SHAMIR]:  Used to
+      distribute key material and other secrets across n
+      shard holders such that any k holders can reconstruct
+      the secret.  The threshold scheme enables key recovery
+      without requiring any single party to hold the complete
+      secret.
+
+   Multi-party attestation:  A generalisation of Shamir
+      threshold schemes to content verification.  M-of-N
+      designated parties independently verify and sign a
+      content hash.  M verified signatures constitute
+      attestation.
+
+6.2.  SHARD-BUNDLE: Shamir Distribution over FDS Channels
+
+   SHARD-BUNDLE is the mechanism for distributing Shamir shards
+   over any channel supported by the stack, including non-binary
+   channels.
+
+   A SHARD-BUNDLE is an FDS-FRAME carrying a single Shamir shard
+   plus the metadata necessary for the recipient to understand
+   its role in the threshold scheme and to contact other shard
+   holders.
+
+   SHARD-BUNDLE structure (encoded as FDS-FRAME payload):
+
+      SHARD: <shard-index>/<total-shards> · T/<threshold>
+      SECRET: <secret-identifier>
+      HOLDER: <recipient-identifier>
+      CONTACTS: <contact-list for other shard holders>
+      ---
+      <shard-material>
+      ---
+      RECOVERY: Join <threshold> of <total-shards> shards using
+      Shamir (k,n) reconstruction.  See CONTACTS for other
+      shard holders.
+
+   The shard material is the raw Shamir shard, base64url-encoded.
+
+   The contact list SHOULD include sufficient information to
+   reach other shard holders over any available channel: name,
+   electronic contact, physical address if appropriate, and
+   the shard holder's public key fingerprint.
+
+   SHARD-BUNDLEs MAY be transmitted over any channel in the
+   stack, including physical media.  A SHARD-BUNDLE printed
+   on archival paper and sealed in a physical archive is a
+   valid shard distribution mechanism.  The shard holder is
+   then a human (or the successor organisation designated to
+   hold that shard) rather than a networked node.
+
+   Implementors are referred to the credmgr reference
+   implementation [CREDMGR] for operational patterns for
+   shard distribution and recovery.
+
+6.3.  MIRROR-ATTESTATION: M-of-N Content Verification
+
+   MIRROR-ATTESTATION extends the Shamir threshold model from
+   secret custody to content integrity verification.
+
+   A MIRROR-ATTESTATION requires M of N designated mirror
+   operators to independently verify and sign the root hash
+   of a Meridian manifest (Section 7).  The composite of M
+   verified signatures constitutes attestation that the
+   mirrored content matches the author's manifest.
+
+   MIRROR-ATTESTATION structure:
+
+      ATTEST: <manifest-domain> · v<manifest-version>
+      ROOT: <hex-encoded manifest root hash>
+      REQUIRED: <M> of <N>
+      SIGNATURES:
+        <mirror-1-FQDN>: <base64url Ed25519 sig over root hash>
+        <mirror-2-FQDN>: <base64url Ed25519 sig over root hash>
+        ...
+
+   Failover SHOULD require M verified signatures before
+   activating, where M is specified in the Meridian manifest's
+   succession terms.  This prevents premature failover due to
+   a compromised or erroneous mirror.
+
+6.4.  Key Custody Across Physical Media
+
+   The trust layer explicitly supports key custody via physical
+   media.  A private key (or Shamir shard thereof) stored on
+   archival paper, sealed in a physical archive, and buried
+   under known-stable conditions is a valid key custody
+   mechanism.
+
+   Physical key custody SHOULD follow the material specifications
+   of [ARCHIVE-PROTOCOL] or equivalent archival standards.
+   Implementations SHOULD include sufficient context in
+   physically stored key material for a human recipient to
+   understand its purpose and use without software documentation.
+
+   The extreme case of physical key custody -- a private key
+   encoded in FDS, printed on archival paper, sealed in a
+   Mylar bag with silica gel, placed in a gasket-sealed
+   container, and buried below the frost line -- is a valid
+   and useful configuration.  The recovery procedure is
+   documented in plaintext in the same container.
+
+
+7.  L5 -- Content Layer: Meridian Protocol
+
+7.1.  Relationship to draft-darley-meridian-protocol-01
+
+   The Meridian Protocol [MERIDIAN] provides L5 of the Resilient
+   Signal Stack.  Meridian defines a signed site manifest format,
+   a delta-synchronization mechanism, and a DNS resource record
+   type (MIRROR RR) for web content preservation and failover.
+
+   The Crowsong Suite provides Meridian with distribution
+   mechanisms operable under conditions where DNS and HTTP are
+   unavailable.  Specifically:
+
+   *  Meridian manifests MAY be distributed as FDS-FRAME messages
+      over any channel in the stack.
+
+   *  Meridian signing keys MAY be distributed via SHARD-BUNDLE
+      over any channel, including physical media.
+
+   *  Meridian failover conditions MAY be verified via
+      MIRROR-ATTESTATION rather than (or in addition to) DNS-
+      based liveness checking.
+
+   *  Meridian succession packets (Section 7.2) MAY be
+      instantiated as physical archives (Section 7.3).
+
+7.2.  Succession Packet
+
+   A SUCCESSION-PACKET is a self-contained bundle carrying all
+   information necessary to activate Meridian failover and
+   continue operation of a preserved site.
+
+   SUCCESSION-PACKET contents:
+
+   1.  The current Meridian manifest (latest signed version)
+
+   2.  SHARD-BUNDLEs for the signing key (one per designated
+       shard holder, pre-addressed)
+
+   3.  MIRROR-ATTESTATION records (pre-computed, pending M-of-N
+       signature collection)
+
+   4.  Activation conditions in human-readable form:
+       - Trigger events (e.g., confirmed origin unavailability
+         for N days; death or incapacity of author)
+       - Recovery threshold (M-of-N for key reconstruction)
+       - Designated steward contact information
+
+   5.  Human-readable context page (see [ARCHIVE-PROTOCOL])
+       explaining the purpose and use of the packet without
+       requiring software documentation
+
+   The SUCCESSION-PACKET MAY be distributed electronically
+   (via DTN-BUNDLE-FDS or standard IP channels) or physically
+   (as a sealed archive per Section 7.3).  Both modes are valid.
+
+7.3.  The Time Capsule as a Protocol Object
+
+   A physical archive -- a sealed, durable container holding
+   printed documents on archival-quality media -- is a valid
+   node in the Crowsong Suite.
+
+   A physical archive instantiating a SUCCESSION-PACKET is an
+   extreme-latency store-and-forward node with the following
+   properties:
+
+   *  Delivery latency: months to decades
+
+   *  Channel class: D (human relay, upon recovery)
+
+   *  Durability: dependent on material specification and
+      burial conditions (see [ARCHIVE-PROTOCOL])
+
+   *  Capacity: limited by container volume; sufficient for
+      manifests, key shards, and context documentation
+
+   *  Authentication: Ed25519 signature, printed and verifiable
+      by any implementation with access to the public key
+
+   *  Error detection: FDS value count and CRC-32, printed in
+      the trailer; verifiable by human inspection
+
+   The recovery procedure for a physical archive is a human
+   relay operation (Class D channel) in which the recovering
+   party reads, verifies, and retransmits the archive contents
+   via whatever channels are available at recovery time.
+
+   Physical archives SHOULD include the FDS decoding procedure
+   in human-readable form, independent of any software
+   documentation, so that a recovering party without access to
+   reference implementations can decode and verify the contents.
+
+
+8.  Deployment Scenarios
+
+8.1.  Normal Operations (full IP stack available)
+
+   In normal operations, the stack operates over Class A channels.
+   L2 FDS encoding is OPTIONAL (it MAY be used for interoperability
+   with mixed environments).  L3 DTN routing operates via standard
+   convergence layers (TCP/IP, UDP/IP).  L4 trust layer operates
+   via standard PKI and network-accessible Shamir implementations.
+   L5 Meridian operates via DNS and HTTPS.
+
+   The primary value of the stack in normal operations is the
+   preparation of SUCCESSION-PACKETs and SHARD-BUNDLEs for use
+   in degraded conditions.  Operators SHOULD NOT wait for
+   degraded conditions to configure the trust layer.
+
+8.2.  Degraded Operations (intermittent connectivity)
+
+   In degraded operations, Class A channels are intermittently
+   available.  L3 DTN store-and-forward provides continuity.
+   FDS encoding is OPTIONAL on Class A channels but SHOULD be
+   used on Class B and C channels that supplement degraded
+   Class A connectivity.  L5 Meridian DNS failover activates
+   for unreachable origins.
+
+8.3.  Disrupted Operations (DTN-only, no IP)
+
+   In disrupted operations, IP connectivity is unavailable.
+   L3 DTN operates over Class B, C, and D channels via
+   DTN-BUNDLE-FDS.  L4 key distribution operates via
+   SHARD-BUNDLE over available channels.  L5 Meridian operates
+   via cached manifests; DNS is unavailable and failover is
+   determined by MIRROR-ATTESTATION.
+
+   This scenario corresponds to the operational environment
+   of the Aeolian Layer [AEOLIAN] during the period described
+   in the reference operational document [FIELDNOTE9].
+
+8.4.  Post-Disruption Recovery (human relay, physical media)
+
+   In post-disruption recovery, Class D channels (human relay)
+   and physical media are the primary transport.  All messages
+   are encoded in FDS and carried by human operators.  Key
+   material is recovered from physical archives via SHARD-BUNDLE.
+   Manifests are distributed via physical courier.
+
+   Recovery operations SHOULD prioritise re-establishment of
+   Class C channels (Morse, optical) before Class B channels,
+   and Class B channels before Class A, to enable progressive
+   capacity restoration.
+
+8.5.  Air-Gapped Environments
+
+   In air-gapped environments, the stack operates without any
+   external network connectivity.  Physical media (USB, printed
+   page, physical archive) are the only transport.  FDS encoding
+   enables content to be carried on printed media and verified
+   by humans.  SHARD-BUNDLE enables key distribution without
+   electronic channels.
+
+   The sovereign computing demonstration [SOVEREIGN] constitutes
+   an air-gapped deployment of layers L2 through L5, with physical
+   media as the L1 channel for initial key and content
+   distribution.
+
+8.6.  Extreme Latency: Physical Archival
+
+   A physical archive (Section 7.3) instantiates the stack with
+   a delivery latency of years to decades.  The archive is a
+   DTN node with a very long custodial time-to-live.  The
+   recovering party is a Class D human relay.
+
+   This scenario is not hypothetical.  Physical archives have
+   successfully preserved information across centuries.  The
+   contribution of this document is to specify the framing and
+   encoding that allows a physical archive to be a legible,
+   verifiable, and recoverable node in a modern communications
+   stack.
+
+
+9.  Security Considerations
+
+   The stack separates error detection, authenticity, and
+   confidentiality; each MUST be considered independently.  FDS
+   encoding provides error detection only.  Ed25519 signatures
+   provide authenticity.  Confidentiality requires an additional
+   encryption layer and is outside the scope of this document.
+
+9.1.  Channel-Specific Threats
+
+   Class B and C channels are subject to interception and
+   modification.  FDS encoding does not provide confidentiality.
+   Operators SHOULD apply encryption at L4 (via GPG or equivalent)
+   before FDS encoding when confidentiality is required.
+
+   Human relay channels (Class D) introduce additional trust
+   assumptions.  Relaying humans may intentionally or
+   unintentionally modify messages.  Ed25519 authentication
+   (Section 4.4) SHOULD be used for all messages carried by
+   human relays.
+
+9.2.  Key Management at Reduced Capability
+
+   In degraded and disrupted operations, key management
+   capabilities may be reduced.  Key rotation, revocation,
+   and distribution may be delayed.  Operators SHOULD pre-
+   distribute SHARD-BUNDLEs during normal operations so that
+   key recovery is possible under degraded conditions.
+
+   The physical key custody mechanism (Section 6.4) is
+   specifically designed for environments where electronic
+   key management is unavailable.
+
+9.3.  Human-Relay Trust
+
+   Human relays are trusted to transmit messages accurately but
+   are not trusted to verify message content or assert sender
+   identity.  Authentication of messages carried via human relay
+   depends entirely on the originating node's Ed25519 signature.
+
+   Operators SHOULD educate human relay operators on the
+   importance of accurate transcription and the meaning of
+   FDS-FRAME integrity check failures.
+
+9.4.  Replay and Sequencing
+
+   FDS-FRAME does not include sequence numbers or replay
+   protection.  L3 DTN bundle sequencing (per RFC 9171) provides
+   ordering and duplicate detection for bundles.  Point-to-point
+   FDS use without L3 is susceptible to replay.  Operators SHOULD
+   include timestamps in message content when replay is a concern.
+
+
+10.  IANA Considerations
+
+   This document requests no actions from IANA.
+
+   The FDS encoding format, SHARD-BUNDLE structure, and
+   MIRROR-ATTESTATION format are informally specified in this
+   document.  If the stack progresses to Proposed Standard,
+   IANA registration of media types for FDS-FRAME and
+   SHARD-BUNDLE will be requested at that time.
+
+
+11.  References
+
+11.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [RFC4838]  Cerf, V., Burleigh, S., Hooke, A., Torgerson, L.,
+              Durst, R., Scott, K., Fall, K., and H. Weiss,
+              "Delay-Tolerant Networking Architecture", RFC 4838,
+              April 2007.
+
+   [RFC9171]  Burleigh, S., Fall, K., and E. Birrane,
+              "Bundle Protocol Version 7", RFC 9171,
+              January 2022.
+
+   [RFC8032]  Josefsson, S. and I. Liusvaara, "Edwards-Curve
+              Digital Signature Algorithm (EdDSA)", RFC 8032,
+              January 2017.
+
+   [RFC4648]  Josefsson, S., "The Base16, Base32, and Base64
+              Data Encodings", RFC 4648, October 2006.
+
+   [RFC4033]  Arends, R., Austein, R., Larson, M., Massey, D.,
+              and S. Rose, "DNS Security Introduction and
+              Requirements", RFC 4033, March 2005.
+
+   [ISO3309]  ISO/IEC 3309:1993, "Information technology --
+              Telecommunications and information exchange between
+              systems -- High-level data link control (HDLC)
+              procedures -- Frame structure."
+
+   [UAX15]    Davis, M. and K. Whistler, "Unicode Normalization
+              Forms", Unicode Standard Annex #15,
+              https://www.unicode.org/reports/tr15/
+
+11.2.  Informative References
+
+   [RFC5050]  Scott, K. and S. Burleigh, "Bundle Protocol
+              Specification", RFC 5050, November 2007.
+
+   [RFC5326]  Ramadas, M., Burleigh, S., and S. Farrell,
+              "Licklider Transmission Protocol - Specification",
+              RFC 5326, September 2008.
+
+   [RFC8615]  Nottingham, M., "Well-Known Uniform Resource
+              Identifiers (URIs)", RFC 8615, May 2019.
+
+   [RFC8030]  Thomson, M., Damaggio, E., and B. Raymor,
+              "Generic Event Delivery Using HTTP Push",
+              RFC 8030, December 2016.
+
+   [SHAMIR]   Shamir, A., "How to Share a Secret",
+              Communications of the ACM, 22(11):612-613,
+              November 1979.
+
+   [MERIDIAN] Darley, T., "The Meridian Protocol",
+              draft-darley-meridian-protocol-01,
+              March 2026.
+
+   [AEOLIAN]  Darley, T., "Windborne Continuity Infrastructure:
+              Architecture and Protocol Considerations for
+              Kite-Borne Delay-Tolerant Mesh Networks in
+              Post-Disruption Environments",
+              draft-darley-aeolian-dtn-arch-00, work in
+              progress.
+
+   [FDS]      Darley, T., "Fox Decimal Script (FDS): A
+              Human-Legible Unicode Encoding for Degraded-Channel
+              Transmission", draft-darley-fds-00, work in progress.
+
+   [SHARD]    Darley, T., "SHARD-BUNDLE and MIRROR-ATTESTATION:
+              Threshold Trust Primitives for the Resilient Signal
+              Stack", draft-darley-shard-bundle-00, work in progress.
+
+   [FIELDNOTE9]
+              Darley, T., "Field Note #9: Dispatch from the
+              Aeolian Layer", Proper Tools Field Notes, 2026.
+
+   [UCSDEC]   Darley, T., "ucs_dec_tool.py -- Fox Decimal
+              Script encoder/decoder", MIT License, 2026.
+              https://github.com/propertools/ucs-dec
+
+   [CREDMGR]  Darley, T., "credmgr -- Securely manage
+              privileged account credentials via Shamir
+              secret sharing", Apache License 2.0, 2012.
+              https://github.com/treyka/credmgr
+
+   [SLB]      Darley, T., "Second Law Blues",
+              encoded as artifact SI-2084-FP-001, 2026.
+
+   [ARCHIVE-PROTOCOL]
+              Darley, T., "Vesper Archive Protocol v1.0",
+              Proper Tools SRL, 2026.
+
+   [SOVEREIGN] Darley, T., "Sovereign Computing: A Bill of
+              Materials", Proper Tools SRL, 2026.
+
+   [BUSH1945] Bush, V., "As We May Think",
+              The Atlantic Monthly, July 1945.
+
+   [NELSON]   Nelson, T.H., "Complex information processing:
+              a file structure for the complex, the changing
+              and the indeterminate", Proceedings of the 1965
+              20th national conference, ACM, 1965.
+
+
+12.  Acknowledgements
+
+   The author thanks Vint Cerf, whose RFC 4838 was designed for
+   a world he hoped would never exist, and who demonstrated that
+   the correct response to this situation is to publish the
+   protocol anyway.
+
+   The author thanks the FIRST Time Security SIG and FIRST
+   Standards SIG for the intellectual environment in which this
+   work developed.
+
+   The author thanks the operators of the Aeolian Layer ground
+   stations, living and otherwise.
+
+   This document was written in Brussels, near the Forêt de
+   Soignes, in the spring of 2026.
+
+
+13.  Author's Address
+
+   Trey Darley
+   Proper Tools SRL
+   Brussels, Belgium
+
+   Email: trey@propertools.be
+   URI:   https://propertools.be
