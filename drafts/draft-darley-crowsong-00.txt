@@ -17,7 +17,12 @@ Dedication
    is the kind you build before you need it, and who demonstrated
    this understanding in what he built.
 
+   What we shared was not secrets. It was a love of math, memes,
+   computers, moms, bread, puns, music, and mathematicians.
+
    We miss him very much today. This was meant as a gift to him.
+   The credmgr tool [CREDMGR], written in 2012, is the operational
+   ancestor of the primitives defined here.
 
 
 Abstract
