@@ -1,0 +1,715 @@
+Internet-Draft                                                 T. Darley
+Intended status: Informational                          Proper Tools SRL
+Expires: 2026-10-01                                        1 April 2026
+
+
+       SHARD-BUNDLE and MIRROR-ATTESTATION
+  Threshold Trust Primitives for the Crowsong Suite
+
+           draft-darley-shard-bundle-00
+
+
+Dedication
+
+   This document is dedicated to the memory of Felix "FX" Lindner
+   (1975-2026), who understood that the most important secrets are
+   the ones you plan to share before you need to.
+
+   The credmgr tool [CREDMGR], written in 2012, is the operational
+   ancestor of the primitives defined here.
+
+
+Abstract
+
+   This document specifies two threshold trust primitives for use
+   within the Crowsong Suite [RSS]:
+
+   SHARD-BUNDLE: A structured message format for distributing
+   Shamir secret-sharing shards over any channel supported by the
+   RSS, including non-binary and human-relay channels.
+
+   MIRROR-ATTESTATION: A multi-party content verification format
+   enabling M-of-N designated mirror operators to attest that a
+   mirrored content corpus matches an author's signed manifest.
+
+   Both primitives compose existing cryptographic standards --
+   Shamir secret sharing [SHAMIR] and Ed25519 [RFC8032] -- without
+   introducing new cryptographic constructions.  Both primitives
+   are encoded using Fox Decimal Script [FDS] for transmission
+   over degraded channels.
+
+   These primitives constitute the L4 Trust Layer of the Resilient
+   Signal Stack.
+
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.  Expires 1 October 2026.
+
+
+Table of Contents
+
+   1.   Introduction
+     1.1.  Motivation
+     1.2.  Relationship to credmgr
+     1.3.  Design Principles
+     1.4.  Terminology
+     1.5.  Relationship to Existing Work
+   2.   SHARD-BUNDLE
+     2.1.  Overview
+     2.2.  Wire Format
+     2.3.  Shard Material Encoding
+     2.4.  Contact List Format
+     2.5.  Physical Instantiation
+     2.6.  Shard Recovery Procedure
+   3.   MIRROR-ATTESTATION
+     3.1.  Overview
+     3.2.  Wire Format
+     3.3.  Signature Scope
+     3.4.  Failover Integration
+   4.   Key Custody Across Physical Media
+     4.1.  Physical Key Custody
+     4.2.  Extreme Latency Key Custody
+     4.3.  Recovery Documentation Requirements
+   5.   Deployment Guidance
+     5.1.  Pre-Disruption Preparation
+     5.2.  Shard Distribution Strategy
+     5.3.  Mirror Attestation Timing
+   6.   Security Considerations
+     6.1.  Threshold Selection
+     6.2.  Shard Holder Compromise
+     6.3.  Physical Media Security
+     6.4.  Timing Attacks on Attestation
+   7.   IANA Considerations
+   8.   References
+     8.1.  Normative References
+     8.2.  Informative References
+   9.   Acknowledgements
+   10.  Author's Address
+
+
+1.  Introduction
+
+1.1.  Motivation
+
+   Secret material -- signing keys, recovery credentials, succession
+   authorisations -- must often outlive the infrastructure through
+   which it was originally distributed.  A signing key for a Meridian
+   manifest [MERIDIAN] must remain recoverable after its custodian
+   becomes unavailable, potentially in conditions where email,
+   HTTPS, and IP networking are all absent.
+
+   The answer to this problem has been known since 1979 [SHAMIR]:
+   split the secret into n shards such that any k shards suffice
+   for reconstruction, and distribute the shards to n trusted
+   parties over independent channels.  No single party holds the
+   complete secret.  Any k parties can reconstruct it.
+
+   The gap that this document addresses is not the cryptography --
+   Shamir's scheme is well-specified and well-implemented -- but
+   the transport.  Existing shard distribution implementations
+   assume electronic channels.  The SHARD-BUNDLE format defined
+   here enables shard distribution over any channel in the
+   Crowsong Suite, including printed paper and human
+   courier.
+
+1.2.  Relationship to credmgr
+
+   The credmgr tool [CREDMGR], first published in 2012, implements
+   the operational pattern formalised in this document: generate
+   a secret, split it via Shamir sharing, encrypt each shard to
+   the recipient's GPG public key, and distribute via email.
+
+   SHARD-BUNDLE generalises this pattern by:
+
+   *  Replacing GPG-encrypted email with FDS-encoded frames
+      suitable for any channel (including non-electronic channels)
+
+   *  Adding explicit contact information for shard holders in a
+      channel-independent format
+
+   *  Specifying a recovery procedure operable without the original
+      software
+
+   *  Defining a physical instantiation path for extreme-latency
+      key custody
+
+   The credmgr implementation [CREDMGR] remains a valid reference
+   for the operational context of shard distribution, even where
+   its specific transport (GPG/email) is not applicable.
+
+1.3.  Design Principles
+
+   No new cryptography.  SHARD-BUNDLE composes Shamir secret
+      sharing and Ed25519.  No new cryptographic constructions
+      are introduced.
+
+   Channel independence.  A SHARD-BUNDLE MUST be transmissible
+      over any channel class defined in [RSS], including Class D
+      (human relay) and physical media.
+
+   Self-describing recovery.  A SHARD-BUNDLE MUST contain
+      sufficient information for a recipient to understand its
+      role in the threshold scheme and to initiate recovery
+      without external documentation.
+
+   Human-legible at the threshold.  The recovery procedure
+      MUST be expressible in plain language within the
+      SHARD-BUNDLE itself.
+
+1.4.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL
+   NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED",
+   "MAY", and "OPTIONAL" are as described in BCP 14 [RFC2119]
+   [RFC8174].
+
+   Shard:  A fragment of a secret produced by Shamir (k,n)
+      secret sharing, where k is the reconstruction threshold
+      and n is the total number of shards.
+
+   Shard holder:  A party designated to hold one shard and
+      to participate in reconstruction when triggered.
+
+   Secret identifier:  A human-readable label identifying the
+      secret to which a shard belongs.  MUST be unique within
+      a deployment.
+
+   Reconstruction threshold (k):  The minimum number of shards
+      required to reconstruct the secret.
+
+   Total shards (n):  The total number of shards produced.
+
+   MIRROR-ATTESTATION:  A multi-party content verification
+      record signed by M of N designated mirror operators.
+
+1.5.  Relationship to Existing Work
+
+   Shamir Secret Sharing [SHAMIR] is the cryptographic primitive
+   used for shard generation and reconstruction.
+
+   The DNSSEC root zone key signing key management procedure
+   [ICANN-DPS] uses Shamir secret sharing with physical key
+   ceremonies as operational precedent for the physical key
+   custody procedures specified in Section 4.
+
+   Fox Decimal Script [FDS] is used for encoding SHARD-BUNDLEs
+   for transmission over non-binary channels.
+
+   The Meridian Protocol [MERIDIAN] is the primary consumer of
+   MIRROR-ATTESTATION records.
+
+
+2.  SHARD-BUNDLE
+
+2.1.  Overview
+
+   A SHARD-BUNDLE is a self-contained message carrying one Shamir
+   shard plus the metadata necessary for:
+
+   *  The recipient to understand what secret the shard belongs to
+   *  The recipient to store the shard securely
+   *  The recipient to initiate or participate in reconstruction
+      when triggered
+   *  The recipient to contact other shard holders
+
+   A SHARD-BUNDLE is transmitted as the payload of an FDS-FRAME
+   [FDS].  The FDS-FRAME authentication extension (Ed25519
+   signature) SHOULD be used to authenticate the sender.
+
+2.2.  Wire Format
+
+   A SHARD-BUNDLE payload (before FDS encoding) has the following
+   structure.  Fields are separated by newlines.  The separator
+   line "---" separates the header fields from the shard material.
+
+      SHARD: <index>/<total> T/<threshold>
+      SECRET: <secret-identifier>
+      HOLDER: <recipient-identifier>
+      CREATED: <ISO8601-timestamp>
+      EXPIRES: <ISO8601-timestamp or NEVER>
+      CONTACTS:
+      <contact-entry>
+      <contact-entry>
+      ...
+      ---
+      <shard-material>
+      ---
+      RECOVERY: To reconstruct <secret-identifier>, obtain shards
+      from <threshold> of the <total> holders listed in CONTACTS
+      above. Combine using Shamir (k,n) reconstruction with k=<k>.
+      The ssss-combine tool or any conformant Shamir implementation
+      may be used. Verify the reconstructed secret against its
+      known hash before use.
+      HASH: <hex-encoded SHA-256 of the reconstructed secret>
+
+   Field definitions:
+
+   SHARD:    <index>/<total> identifies this shard's position in
+             the set (1-indexed).  T/<threshold> is the minimum
+             number of shards required for reconstruction.
+
+   SECRET:   Human-readable identifier for the protected secret.
+             Examples: "meridian-signing-key-example.com",
+             "vesper-ca-root-key-2026".  MUST be unique within
+             the deployment.
+
+   HOLDER:   Identifier for the intended recipient of this shard.
+             MAY be a name, handle, or role description.
+
+   CREATED:  ISO 8601 timestamp of shard creation.
+
+   EXPIRES:  ISO 8601 timestamp after which this shard SHOULD be
+             considered stale, or the literal string "NEVER".
+             Implementors SHOULD set an expiry and rotate shards
+             before expiry.
+
+   CONTACTS: A list of contact entries for all OTHER shard holders
+             (not the recipient of this specific bundle).  Format
+             defined in Section 2.4.
+
+   Shard material: The raw Shamir shard, base64url-encoded [RFC4648].
+
+   RECOVERY: Plain-language reconstruction instructions.  MUST be
+             sufficient for a technically capable person to perform
+             reconstruction without additional documentation.
+
+   HASH:     SHA-256 of the complete reconstructed secret (before
+             any application-specific processing).  Used to verify
+             successful reconstruction.
+
+2.3.  Shard Material Encoding
+
+   The Shamir shard is the output of a (k,n) threshold scheme
+   applied to the secret.  The shard is base64url-encoded before
+   inclusion in the SHARD-BUNDLE payload.
+
+   Implementations SHOULD use a well-audited Shamir implementation.
+   The ssss tool [SSSS] is the reference implementation used by
+   credmgr [CREDMGR].  Other conformant implementations MAY be
+   used provided they produce output compatible with the specified
+   reconstruction procedure.
+
+2.4.  Contact List Format
+
+   Each contact entry in the CONTACTS section has the following
+   format (one entry per line, fields separated by " | "):
+
+      NAME: <name> | EMAIL: <address> | PHONE: <number> |
+      PHYSICAL: <address> | KEY: <Ed25519 pubkey fingerprint>
+
+   All fields are OPTIONAL.  At least one contact method MUST
+   be present per entry.
+
+   The contact list MUST include entries for all shard holders
+   EXCEPT the recipient of this specific SHARD-BUNDLE.
+
+   Rationale: In a disrupted environment, shard holders may need
+   to contact each other using whatever channels remain available.
+   Including physical addresses and phone numbers (not just email)
+   is essential for Class D (human relay) operation.
+
+2.5.  Physical Instantiation
+
+   A SHARD-BUNDLE MAY be physically instantiated as a printed
+   document on archival-quality paper, sealed in a durable
+   container per [ARCHIVE-PROTOCOL].
+
+   Physical SHARD-BUNDLEs MUST include:
+
+   1.  The complete SHARD-BUNDLE content (before FDS encoding),
+       printed in a human-readable font at sufficient size for
+       reliable reading without magnification.
+
+   2.  The FDS-encoded form of the SHARD-BUNDLE payload, formatted
+       per [FDS] with COL/6 and WIDTH/5 defaults.
+
+   3.  The FDS decoding procedure in plain language, sufficient
+       for a person without software to decode the FDS content
+       manually given a Unicode table.
+
+   4.  Contact information for the designated recovery coordinator
+       (if any), in plain text.
+
+   Both human-readable and FDS-encoded forms MUST be present.
+   The human-readable form allows direct reading without decoding.
+   The FDS-encoded form enables machine processing during recovery.
+
+2.6.  Shard Recovery Procedure
+
+   Recovery is initiated when the trigger conditions specified in
+   the associated SUCCESSION-PACKET [RSS] are met, or when the
+   authorised recovery coordinator determines reconstruction is
+   necessary.
+
+   Procedure:
+
+   1.  Contact shard holders using information in the CONTACTS
+       field of any available SHARD-BUNDLE.
+
+   2.  Collect k or more shards from k or more holders.
+
+   3.  Reconstruct the secret using a conformant Shamir
+       implementation.  Reference:
+
+          ssss-combine -t <k> -n <n>
+          # Enter each shard when prompted
+
+   4.  Verify the reconstructed secret against the HASH field.
+       If verification fails, the reconstruction is invalid.
+       Do not use the reconstructed value.
+
+   5.  If physical SHARD-BUNDLEs are used, decode the FDS-encoded
+       shard material per [FDS] before input to the Shamir
+       implementation.
+
+
+3.  MIRROR-ATTESTATION
+
+3.1.  Overview
+
+   MIRROR-ATTESTATION is a multi-party content verification record
+   for use with the Meridian Protocol [MERIDIAN].  It enables M
+   of N designated mirror operators to independently verify and
+   sign the root hash of a Meridian manifest, producing a composite
+   attestation that the mirrored content matches the author's
+   signed manifest.
+
+   M verified signatures constitute attestation.  Fewer than M
+   verified signatures do not.
+
+   MIRROR-ATTESTATION extends the Shamir threshold model from
+   secret custody to content integrity.  The threshold structure
+   is the same; the protected value is a content hash rather than
+   a secret.
+
+3.2.  Wire Format
+
+   A MIRROR-ATTESTATION record has the following structure:
+
+      ATTEST: <domain> v<manifest-version>
+      ROOT: <hex-encoded manifest root hash>
+      REQUIRED: <M> of <N>
+      CREATED: <ISO8601-timestamp>
+      EXPIRES: <ISO8601-timestamp>
+      SIGNATURES:
+      <mirror-FQDN>: <base64url Ed25519 sig over root hash>
+      <mirror-FQDN>: <base64url Ed25519 sig over root hash>
+      ...
+
+   Field definitions:
+
+   ATTEST:    Domain name and manifest version being attested.
+              Example: "ATTEST: example.com v2026-03-22"
+
+   ROOT:      The manifest root hash, computed as specified in
+              [MERIDIAN] Section 3.3.
+
+   REQUIRED:  The minimum number of valid signatures required
+              to consider the attestation valid (M of N).
+              M MUST be greater than 1.  M SHOULD be at least
+              ceil(N/2) + 1.
+
+   SIGNATURES: One entry per mirror operator that has verified
+              the content and signed the root hash.  Additional
+              entries MAY be appended as more mirror operators
+              complete verification.  A MIRROR-ATTESTATION with
+              fewer than M entries is pending and MUST NOT be
+              used to trigger failover.
+
+3.3.  Signature Scope
+
+   Each signature in the SIGNATURES section is an Ed25519
+   signature computed over the following input:
+
+      UTF-8 encoding of:
+      "MIRROR-ATTESTATION\n"
+      + <domain> + "\n"
+      + <manifest-version> + "\n"
+      + <hex-encoded root hash> + "\n"
+
+   The domain-separated prefix "MIRROR-ATTESTATION\n" prevents
+   cross-protocol signature reuse.
+
+   Verifiers MUST reconstruct this input and verify each
+   signature independently.  A MIRROR-ATTESTATION is valid
+   when at least M signatures verify correctly against known
+   mirror operator public keys.
+
+3.4.  Failover Integration
+
+   When integrated with the Meridian Protocol [MERIDIAN], a
+   MIRROR-ATTESTATION with M valid signatures constitutes the
+   trust signal for failover activation, supplementing or
+   replacing DNS-based liveness checking under conditions where
+   DNS is unavailable.
+
+   The M threshold SHOULD be specified in the Meridian manifest's
+   succession terms.  In the absence of a specified threshold,
+   implementations MUST require N (all signatories) rather than
+   defaulting to a lower value.
+
+
+4.  Key Custody Across Physical Media
+
+4.1.  Physical Key Custody
+
+   The L4 trust layer explicitly supports key custody via physical
+   media.  A private key (or Shamir shard thereof) stored on
+   archival paper, sealed in a durable container, and preserved
+   under known-stable conditions is a valid key custody mechanism.
+
+   Physical key custody is not a fallback.  For secrets that must
+   survive the loss of all electronic infrastructure, physical
+   key custody is the primary mechanism.
+
+   Physical key custody SHOULD conform to [ARCHIVE-PROTOCOL] for
+   material specifications.  The container, desiccant, and sealing
+   requirements of [ARCHIVE-PROTOCOL] provide a baseline for
+   multi-decade preservation.
+
+4.2.  Extreme Latency Key Custody
+
+   An extreme latency key custody arrangement -- where a shard
+   is sealed in a physical archive intended to be recovered years
+   or decades hence -- is a valid SHARD-BUNDLE instantiation.
+
+   For extreme latency custody:
+
+   *  The EXPIRES field MUST be set to a date sufficiently far in
+      the future to accommodate the intended custody period, or
+      to "NEVER" if no expiry is appropriate.
+
+   *  The RECOVERY instructions MUST be written at a level of
+      detail sufficient for a person with no knowledge of the
+      original deployment to perform reconstruction.
+
+   *  The FDS decoding procedure MUST be included in plain
+      language within the physical archive.
+
+   *  The Unicode table required for manual FDS decoding SHOULD
+      be included (or a reference to a stable public source
+      provided).
+
+   *  Contact information SHOULD include physical addresses and
+      institutional affiliations, not only email addresses.
+
+4.3.  Recovery Documentation Requirements
+
+   Any physical SHARD-BUNDLE intended for recovery in a disrupted
+   environment MUST include the following in plain text within
+   the sealed container:
+
+   1.  What this document is and why it matters.
+
+   2.  The reconstruction threshold and the identities of other
+       shard holders.
+
+   3.  The FDS decoding procedure (without assuming software
+       availability).
+
+   4.  The Shamir reconstruction procedure (without assuming
+       the ssss tool is available -- include a description of
+       the mathematical procedure or a reference to a stable
+       published source).
+
+   5.  Contact information for the recovery coordinator.
+
+   6.  The expected use of the reconstructed secret.
+
+   The goal is that a technically capable person who finds this
+   archive in a future with no internet access and no knowledge
+   of the original deployment can understand what they have found
+   and what to do with it.
+
+
+5.  Deployment Guidance
+
+5.1.  Pre-Disruption Preparation
+
+   SHARD-BUNDLEs and MIRROR-ATTESTATIONs MUST be prepared during
+   normal operations, before degraded conditions occur.
+
+   Operators MUST NOT wait for a disruption to distribute key
+   material.  The value of threshold secret sharing is entirely
+   in the pre-distribution.  A shard distributed after the
+   disruption that made it necessary is a shard distributed
+   too late.
+
+5.2.  Shard Distribution Strategy
+
+   Shards SHOULD be distributed over independent channels.
+   Distributing all shards over the same channel (e.g., all
+   via email) provides no resilience against loss of that
+   channel.
+
+   Recommended distribution strategy for a (k,n) scheme:
+
+   *  At least one shard via electronic channel (email, secure
+      messaging)
+
+   *  At least one shard as a physical SHARD-BUNDLE (printed,
+      sealed, held by a trusted party)
+
+   *  At least one shard as an extreme-latency physical archive
+      (buried or similarly preserved)
+
+   *  If n > 3, additional shards MAY use any available channel
+
+   This strategy ensures reconstruction is possible even if
+   all electronic channels are permanently unavailable.
+
+5.3.  Mirror Attestation Timing
+
+   MIRROR-ATTESTATION records SHOULD be produced immediately
+   after a new Meridian manifest version is published and
+   mirrors have synchronised.
+
+   Operators SHOULD not wait until failover is imminent to
+   collect attestation signatures.  Collecting signatures
+   under normal conditions, when all mirror operators have
+   reliable connectivity, is significantly easier than
+   collecting them under degraded conditions.
+
+
+6.  Security Considerations
+
+6.1.  Threshold Selection
+
+   The reconstruction threshold k MUST be selected to balance
+   availability (k small enough that reconstruction is feasible
+   if some shard holders are unavailable) against security (k
+   large enough that compromise of a small number of shard
+   holders does not expose the secret).
+
+   k SHOULD be at least ceil(n/2) + 1 for security-critical
+   secrets.  k MAY be lower for operational convenience where
+   the threat model permits.
+
+   The MIRROR-ATTESTATION threshold M SHOULD follow the same
+   guidance.
+
+6.2.  Shard Holder Compromise
+
+   Compromise of k-1 or fewer shard holders does not expose the
+   secret.  Compromise of k or more shard holders does.
+
+   Operators SHOULD monitor for indicators of shard holder
+   compromise and rotate secrets (generating new shards and
+   distributing to the same or new holder set) if compromise
+   is suspected.
+
+   Rotation requires that all existing shards be superseded.
+   Operators MUST notify all shard holders when rotation occurs
+   and MUST provide updated SHARD-BUNDLEs via the same
+   channel diversity as the original distribution.
+
+6.3.  Physical Media Security
+
+   Physical SHARD-BUNDLEs are subject to physical access threats.
+   Sealed containers at known locations may be discovered by
+   parties other than the intended recipients.
+
+   Physical SHARD-BUNDLEs MUST be stored at locations known only
+   to the intended recipients and the recovery coordinator.
+
+   Physical SHARD-BUNDLEs SHOULD be additionally encrypted (e.g.,
+   via GPG) before printing, so that physical access to the
+   container does not immediately yield the shard material.
+   The decryption key may be held by the shard holder personally
+   or via a separate custody arrangement.
+
+6.4.  Timing Attacks on Attestation
+
+   A MIRROR-ATTESTATION that has been produced but not yet
+   activated (fewer than M signatures collected) MUST be treated
+   as pending and MUST NOT be used for failover decisions.
+
+   Operators MUST validate the EXPIRES field before using a
+   MIRROR-ATTESTATION.  Stale attestations MUST NOT be used.
+
+
+7.  IANA Considerations
+
+   This document requests no actions from IANA at this time.
+   If the SHARD-BUNDLE and MIRROR-ATTESTATION formats progress
+   to Proposed Standard, IANA registration of media types will
+   be requested.
+
+
+8.  References
+
+8.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in
+              RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [RFC8032]  Josefsson, S. and I. Liusvaara, "Edwards-Curve
+              Digital Signature Algorithm (EdDSA)", RFC 8032,
+              January 2017.
+
+   [RFC4648]  Josefsson, S., "The Base16, Base32, and Base64
+              Data Encodings", RFC 4648, October 2006.
+
+   [SHAMIR]   Shamir, A., "How to Share a Secret",
+              Communications of the ACM, 22(11):612-613,
+              November 1979.
+
+8.2.  Informative References
+
+   [RSS]      Darley, T., "The Crowsong Suite",
+              draft-darley-crowsong-00,
+              work in progress.
+
+   [FDS]      Darley, T., "Fox Decimal Script (FDS)",
+              draft-darley-fds-00, work in progress.
+
+   [MERIDIAN] Darley, T., "The Meridian Protocol",
+              draft-darley-meridian-protocol-01, March 2026.
+
+   [CREDMGR]  Darley, T., "credmgr -- Securely manage privileged
+              account credentials via Shamir secret sharing",
+              Apache License 2.0, 2012.
+              https://github.com/treyka/credmgr
+
+   [SSSS]     Meijer, B., "ssss: Shamir's Secret Sharing Scheme",
+              http://point-at-infinity.org/ssss/
+
+   [ARCHIVE-PROTOCOL]
+              Darley, T., "Vesper Archive Protocol v1.0",
+              Proper Tools SRL, 2026.
+
+   [ICANN-DPS]
+              ICANN, "DNSSEC Practice Statement for the Root
+              Zone KSK Operator", current version.
+              https://www.iana.org/dnssec/icann-dps.txt
+
+
+9.  Acknowledgements
+
+   The operational pattern formalised in this document was first
+   implemented in credmgr [CREDMGR] in 2012.  The jump from
+   GPG-encrypted email to FDS-encoded physical archives is smaller
+   than it appears: both are answers to the same question, which
+   is how to carry a secret across a gap in the infrastructure
+   to someone who needs it on the other side.
+
+   The DNSSEC root zone key ceremony [ICANN-DPS] provides the
+   most prominent existing precedent for physical key custody in
+   a critical infrastructure context.  The authors of that
+   procedure understood that some secrets are too important to
+   trust to any single channel.
+
+
+10.  Author's Address
+
+   Trey Darley
+   Proper Tools SRL
+   Brussels, Belgium
+
+   Email: trey@propertools.be
+   URI:   https://propertools.be
