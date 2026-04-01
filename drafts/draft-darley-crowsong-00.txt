@@ -15,7 +15,9 @@ Dedication
    This document is dedicated to the memory of Felix "FX" Lindner
    (1975-2026), who understood that the most important infrastructure
    is the kind you build before you need it, and who demonstrated
-   this understanding in everything he made.
+   this understanding in what he built.
+
+   We miss him very much today. This was meant as a gift to him.
 
 
 Abstract
@@ -26,7 +28,7 @@ Abstract
    connectivity, and potentially binary-capable transport itself,
    may be absent.
 
-   The Crowsong Suite (RSS) composes five independently
+   The Crowsong Suite composes five independently
    deployable layers spanning physical transport classification,
    human-legible encoding, delay-tolerant routing, threshold trust,
    and signed content continuity.  The stack builds on existing
