@@ -1,0 +1,314 @@
++======================================================================+
+|                  FOX DECIMAL SCRIPT (FDS)                            |
+|                Unicode Quick Reference Table                         |
+|                                                                      |
+|  Format: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5                    |
+|  Extended: WIDTH/7 required for code points above 99999             |
+|                                                                      |
+|  Decoding: for each token, look up decimal value in this table.     |
+|  Skip 00000 (padding). Unknown values: mark and continue.         |
+|                                                                      |
+|  draft-darley-fds-00  ·  github.com/propertools/crowsong            |
++======================================================================+
+
+========================================================================
+  DECODING PROCEDURE (no software required)
+========================================================================
+
+  1. Read tokens left to right, top to bottom.
+  2. Skip any token equal to the padding value (00000 / 0000000).
+  3. For each remaining token:
+       a. Find the decimal value in this table.
+       b. Write the character shown.
+       c. If not found: write [?TOKEN] and continue.
+  4. Newline (00010) = start a new line.
+  5. A corrupted token affects only that character. Continue.
+  6. Verify: total non-padding token count must match trailer.
+
+========================================================================
+  FIELD WIDTH
+========================================================================
+
+  WIDTH/5 (default)  Tokens are 5 digits.  Range: 00000–99999.
+                     Covers Basic Multilingual Plane and most
+                     common characters.
+
+  WIDTH/7 (extended) Tokens are 7 digits.  Range: 0000000–1114111.
+                     Required for emoji and supplementary planes.
+                     Header will read: WIDTH/7
+
+  If tokens are 7 digits wide, use the 7-digit values below.
+
+========================================================================
+  SECTION 1 — CONTROL AND WHITESPACE
+========================================================================
+
+  --- WIDTH/5 values ---
+
+       0   ∅     NULL / padding — SKIP
+       9   →     Horizontal tab
+      10   ↵     Line feed (newline) — start new line
+      13   ¶     Carriage return
+      32         Space
+
+========================================================================
+  SECTION 2 — ASCII PRINTABLE (32–126)
+========================================================================
+
+  --- Punctuation and symbols (33–64) ---
+
+      33   !     Exclamation mark
+      34   "     Quotation mark
+      35   #     Number sign
+      36   $     Dollar sign
+      37   %     Percent sign
+      38   &     Ampersand
+      39   '     Apostrophe
+      40   (     Left parenthesis
+      41   )     Right parenthesis
+      42   *     Asterisk
+      43   +     Plus sign
+      44   ,     Comma
+      45   -     Hyphen-minus
+      46   .     Full stop
+      47   /     Solidus / slash
+      48   0     Digit zero
+      57   9     Digit nine
+      58   :     Colon
+      59   ;     Semicolon
+      60   <     Less-than sign
+      61   =     Equals sign
+      62   >     Greater-than sign
+      63   ?     Question mark
+      64   @     Commercial at
+
+  Digits 0–9: decimal 48 (zero) through 57 (nine)
+  e.g. character '3' = code point 51
+
+  --- Uppercase Latin (65–90) ---
+
+  65=A  66=B  67=C  68=D  69=E  70=F  71=G  72=H  73=I
+  74=J  75=K  76=L  77=M  78=N  79=O  80=P  81=Q  82=R
+  83=S  84=T  85=U  86=V  87=W  88=X  89=Y  90=Z
+
+  --- Lowercase Latin (97–122) ---
+
+  97=a  98=b  99=c 100=d 101=e 102=f 103=g 104=h 105=i
+ 106=j 107=k 108=l 109=m 110=n 111=o 112=p 113=q 114=r
+ 115=s 116=t 117=u 118=v 119=w 120=x 121=y 122=z
+
+  --- Remaining ASCII symbols (91–96, 123–126) ---
+
+      91   [     Left square bracket
+      92   \     Reverse solidus
+      93   ]     Right square bracket
+      94   ^     Circumflex accent
+      95   _     Low line / underscore
+      96   `     Grave accent
+     123   {     Left curly bracket
+     124   |     Vertical line
+     125   }     Right curly bracket
+     126   ~     Tilde
+
+========================================================================
+  SECTION 3 — EXTENDED LATIN AND COMMON DIACRITICS (128–591)
+========================================================================
+
+  --- Most frequently used ---
+
+     160         Non-breaking space
+     161   ¡     Inverted exclamation mark
+     162   ¢     Cent sign
+     163   £     Pound sign
+     165   ¥     Yen sign
+     169   ©     Copyright sign
+     171   «     Left-pointing double angle quotation mark
+     174   ®     Registered sign
+     176   °     Degree sign
+     180   ´     Acute accent
+     183   ·     Middle dot
+     187   »     Right-pointing double angle quotation mark
+     192   À     Latin capital letter A with grave
+     193   Á     Latin capital letter A with acute
+     194   Â     Latin capital letter A with circumflex
+     195   Ã     Latin capital letter A with tilde
+     196   Ä     Latin capital letter A with diaeresis
+     199   Ç     Latin capital letter C with cedilla
+     200   È     Latin capital letter E with grave
+     201   É     Latin capital letter E with acute
+     202   Ê     Latin capital letter E with circumflex
+     206   Î     Latin capital letter I with circumflex
+     212   Ô     Latin capital letter O with circumflex
+     214   Ö     Latin capital letter O with diaeresis
+     217   Ù     Latin capital letter U with grave
+     219   Û     Latin capital letter U with circumflex
+     220   Ü     Latin capital letter U with diaeresis
+     224   à     Latin small letter a with grave
+     225   á     Latin small letter a with acute
+     226   â     Latin small letter a with circumflex
+     228   ä     Latin small letter a with diaeresis
+     231   ç     Latin small letter c with cedilla
+     232   è     Latin small letter e with grave
+     233   é     Latin small letter e with acute
+     234   ê     Latin small letter e with circumflex
+     238   î     Latin small letter i with circumflex
+     244   ô     Latin small letter o with circumflex
+     246   ö     Latin small letter o with diaeresis
+     249   ù     Latin small letter u with grave
+     251   û     Latin small letter u with circumflex
+     252   ü     Latin small letter u with diaeresis
+
+========================================================================
+  SECTION 4 — GENERAL PUNCTUATION (8192–8303)
+========================================================================
+
+  --- Typographic punctuation ---
+
+    8194         En space
+    8195         Em space
+    8211   –     En dash
+    8212   —     Em dash
+    8216   ‘     Left single quotation mark
+    8217   ’     Right single quotation mark
+    8218   ‚     Single low-9 quotation mark
+    8220   “     Left double quotation mark
+    8221   ”     Right double quotation mark
+    8226   •     Bullet
+    8230   …     Horizontal ellipsis
+    8239         Narrow no-break space
+    8242   ′     Prime
+    8243   ″     Double prime
+
+========================================================================
+  SECTION 5 — UTILITY SYMBOLS
+========================================================================
+
+  --- Mathematical and logical ---
+
+     177   ±     Plus-minus sign
+     215   ×     Multiplication sign
+     247   ÷     Division sign
+    8592   ←     Leftwards arrow
+    8593   ↑     Upwards arrow
+    8594   →     Rightwards arrow
+    8595   ↓     Downwards arrow
+    8596   ↔     Left right arrow
+    8712   ∈     Element of
+    8713   ∉     Not an element of
+    8734   ∞     Infinity
+    8800   ≠     Not equal to
+    8804   ≤     Less-than or equal to
+    8805   ≥     Greater-than or equal to
+
+  --- Operational symbols (check, cross, warning) ---
+
+    9733   ★     Black star
+    9734   ☆     White star
+    9744   ☐     Ballot box (unchecked)
+    9745   ☑     Ballot box with check
+    9746   ☒     Ballot box with X
+    9888   ⚠     Warning sign
+    9989   ✅     White heavy check mark
+   10003   ✓     Check mark
+   10007   ✗     Ballot X
+   10060   ✘     Heavy ballot X
+
+========================================================================
+  SECTION 6 — CJK AND ATTRIBUTION
+========================================================================
+
+  --- Canonical attribution characters (SI-2084-FP-001) ---
+
+   26716   桜     Sakura — cherry blossom (さくら)
+   31282   稲     Ine — rice plant (いね)
+   33655   荷     Ka — load / cargo (に)
+
+  These three values appear as the first tokens of artifact
+  SI-2084-FP-001. Decoded: 桜稲荷 (Sakura Inari).
+
+  CJK Unified Ideographs range: 19968–40959 (U+4E00–U+9FFF)
+  CJK Extension A:              13312–19903 (U+3400–U+4DBF)
+  Full CJK lookup: https://unicode.org/charts/
+
+========================================================================
+  SECTION 7 — EMOJI (WIDTH/7 REQUIRED)
+========================================================================
+
+  All emoji code points exceed 99999 and cannot be represented
+  in WIDTH/5. The frame header MUST declare WIDTH/7.
+
+  Header for emoji content:
+    ENC: UCS · DEC · COL/6 · PAD/0000000 · WIDTH/7
+
+
+  --- Worked example — The Fox, the Chicken, and the Grain ---
+
+  The classic river-crossing routing problem, encoded in FDS.
+  Constraint: the fox cannot be left with the chicken;
+  the chicken cannot be left with the grain.
+  The farmer (🚣) must route all three across safely.
+
+  Character  Code Point   Decimal    FDS (WIDTH/7)
+  --------------------------------------------------------
+    🚣        U+1F6A3      128675     0128675   Person rowing boat — the farmer / operator
+    🐓        U+1F413      128019     0128019   Rooster / chicken
+    🦊        U+1F98A      129418     0129418   Fox
+    🌾        U+1F33E      127806     0127806   Sheaf of grain
+
+  Encoded message (WIDTH/7, COL/4):
+    ENC: UCS · DEC · COL/4 · PAD/0000000 · WIDTH/7
+    0128675  0128019  0129418  0127806
+    4 VALUES · VERIFY COUNT BEFORE USE
+
+  Decoded: 🚣🐓🦊🌾
+
+  Note: the farmer must make three crossings, not one.
+  Store-and-forward. Routing around constraints.
+  The mesh does not require you to cross everything at once.
+
+  --- Further emoji ranges (WIDTH/7) ---
+
+  Emoticons:            128512–128591   (U+1F600–U+1F64F)
+  Misc symbols & pictog: 127744–128511  (U+1F300–U+1F5FF)
+  Transport & map:      128640–128767   (U+1F680–U+1F6FF)
+  Supplemental symbols: 129280–129535   (U+1F900–U+1F9FF)
+
+  Full emoji list: https://unicode.org/emoji/charts/full-emoji-list.html
+
+========================================================================
+  SECTION 8 — QUICK DECODE GRID (ASCII 32–126)
+========================================================================
+
+  For fast hand-decoding of standard ASCII messages.
+  Find the token value; read the character directly.
+
+   Val  Ch    Val  Ch    Val  Ch    Val  Ch    Val  Ch
+  ----------------------------------------------------------
+     32  SP      33  !       34  "       35  #       36  $ 
+     37  %       38  &       39  '       40  (       41  ) 
+     42  *       43  +       44  ,       45  -       46  . 
+     47  /       48  0       49  1       50  2       51  3 
+     52  4       53  5       54  6       55  7       56  8 
+     57  9       58  :       59  ;       60  <       61  = 
+     62  >       63  ?       64  @       65  A       66  B 
+     67  C       68  D       69  E       70  F       71  G 
+     72  H       73  I       74  J       75  K       76  L 
+     77  M       78  N       79  O       80  P       81  Q 
+     82  R       83  S       84  T       85  U       86  V 
+     87  W       88  X       89  Y       90  Z       91  [ 
+     92  \       93  ]       94  ^       95  _       96  ` 
+     97  a       98  b       99  c      100  d      101  e 
+    102  f      103  g      104  h      105  i      106  j 
+    107  k      108  l      109  m      110  n      111  o 
+    112  p      113  q      114  r      115  s      116  t 
+    117  u      118  v      119  w      120  x      121  y 
+    122  z      123  {      124  |      125  }      126  ~ 
+
++======================================================================+
+|                                                                      |
+|  Full Unicode reference: https://unicode.org/charts/                 |
+|  FDS specification:      draft-darley-fds-00                         |
+|  Repository:             github.com/propertools/crowsong             |
+|                                                                      |
+|  549 VALUES · CRC32:148A80A0 · SIGNAL SURVIVES                       |
++======================================================================+
