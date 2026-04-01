@@ -1,0 +1,3 @@
+[submodule "meridian-protocol"]
+	path = meridian-protocol
+	url = https://github.com/propertools/meridian-protocol
