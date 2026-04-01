@@ -22,11 +22,11 @@ Dedication
 Abstract
 
    This document specifies two threshold trust primitives for use
-   within the Crowsong Suite [RSS]:
+   within the Crowsong Suite [CROWSONG]:
 
    SHARD-BUNDLE: A structured message format for distributing
    Shamir secret-sharing shards over any channel supported by the
-   RSS, including non-binary and human-relay channels.
+   the Crowsong Suite, including non-binary and human-relay channels.
 
    MIRROR-ATTESTATION: A multi-party content verification format
    enabling M-of-N designated mirror operators to attest that a
@@ -146,7 +146,7 @@ Table of Contents
       are introduced.
 
    Channel independence.  A SHARD-BUNDLE MUST be transmissible
-      over any channel class defined in [RSS], including Class D
+      over any channel class defined in [CROWSONG], including Class D
       (human relay) and physical media.
 
    Self-describing recovery.  A SHARD-BUNDLE MUST contain
@@ -339,7 +339,7 @@ Table of Contents
 2.6.  Shard Recovery Procedure
 
    Recovery is initiated when the trigger conditions specified in
-   the associated SUCCESSION-PACKET [RSS] are met, or when the
+   the associated SUCCESSION-PACKET [CROWSONG] are met, or when the
    authorised recovery coordinator determines reconstruction is
    necessary.
 
@@ -661,7 +661,7 @@ Table of Contents
 
 8.2.  Informative References
 
-   [RSS]      Darley, T., "The Crowsong Suite",
+   [CROWSONG]      Darley, T., "The Crowsong Suite",
               draft-darley-crowsong-00,
               work in progress.
 
@@ -692,11 +692,13 @@ Table of Contents
 9.  Acknowledgements
 
    The operational pattern formalised in this document was first
-   implemented in credmgr [CREDMGR] in 2012.  The jump from
-   GPG-encrypted email to FDS-encoded physical archives is smaller
-   than it appears: both are answers to the same question, which
-   is how to carry a secret across a gap in the infrastructure
-   to someone who needs it on the other side.
+   implemented in credmgr [CREDMGR], whose first commit is dated
+   23 June 2012.  The jump from GPG-encrypted email to FDS-encoded
+   physical archives is smaller than it appears: both are answers
+   to the same question, which is how to carry a secret across a
+   gap in the infrastructure to someone who needs it on the other
+   side.  The lineage from that first commit to this document is
+   fourteen years of the same design philosophy.
 
    The DNSSEC root zone key ceremony [ICANN-DPS] provides the
    most prominent existing precedent for physical key custody in
