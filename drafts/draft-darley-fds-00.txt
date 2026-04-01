@@ -13,9 +13,11 @@ Expires: 2026-10-01                                        1 April 2026
 Dedication
 
    This document is dedicated to the memory of Felix "FX" Lindner
-   (1975-2026).
+   (1975-2026), who understood that the most important infrastructure
+   is the kind you build before you need it, and who demonstrated
+   this understanding in what he built.
 
-   The canonical test vector for this specification is a poem.
+   We miss him very much today. This was meant as a gift to him.
    This seemed appropriate.
 
 
