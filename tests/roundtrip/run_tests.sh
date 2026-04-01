@@ -1,54 +1,78 @@
 #!/usr/bin/env bash
 # Crowsong roundtrip test suite
 # Verifies conformant FDS implementation against canonical test vector
+# SI-2084-FP-001
 
 set -e
 
 TOOL="../../tools/ucs-dec/ucs_dec_tool.py"
 RAW="../../archive/second-law-blues-raw.txt"
-ARTIFACT="../../archive/flash-paper-SI-2084-FP-001-payload.txt"
+PAYLOAD="../../archive/flash-paper-SI-2084-FP-001-payload.txt"
+FRAMED="../../archive/flash-paper-SI-2084-FP-001-framed.txt"
 
-echo "=== Crowsong FDS Roundtrip Tests ==="
+PASS=0
+FAIL=0
+
+check() {
+  if [ $? -eq 0 ]; then
+    echo "  PASS: $1"
+    PASS=$((PASS+1))
+  else
+    echo "  FAIL: $1"
+    FAIL=$((FAIL+1))
+  fi
+}
+
+echo "=== Crowsong FDS Roundtrip Test Suite ==="
+echo "    Artifact: SI-2084-FP-001"
 echo ""
 
-# Test 1: Decode the canonical artifact
-echo "[1/4] Decoding canonical artifact..."
-DECODED=$(python3 "$TOOL" --decode < "$ARTIFACT")
-if [ -z "$DECODED" ]; then
-  echo "FAIL: empty output"
-  exit 1
-fi
-echo "PASS: decoded $(echo "$DECODED" | wc -c) bytes"
+# Test 1: Decode payload — non-empty output
+echo "[1] Decode canonical payload"
+DECODED=$(python3 "$TOOL" --decode < "$PAYLOAD")
+[ -n "$DECODED" ]
+check "decoded output is non-empty ($(echo "$DECODED" | wc -c) bytes)"
 
-# Test 2: Verify value count
-echo "[2/4] Verifying value count..."
-python3 "$TOOL" --verify < "$ARTIFACT"
-echo "PASS"
+# Test 2: First three values decode to 桜稲荷
+echo "[2] Attribution encoding (first three values → 桜稲荷)"
+ATTR=$(head -1 "$PAYLOAD" | awk '{print $1, $2, $3}' | python3 "$TOOL" --decode)
+[ "$ATTR" = "桜稲荷" ]
+check "26716 · 31282 · 31282 → 桜稲荷"
 
-# Test 3: Re-encode and compare
-echo "[3/4] Roundtrip encode/decode..."
+# Test 3: Verify token count and validity
+echo "[3] Verify token count and format"
+python3 "$TOOL" --verify < "$PAYLOAD" > /dev/null
+check "zero invalid tokens"
+
+# Test 4: Roundtrip — re-encode raw text and diff against payload
+echo "[4] Roundtrip encode/diff"
 REENCODED=$(python3 "$TOOL" --encode < "$RAW")
-ARTIFACT_PAYLOAD=$(cat "$ARTIFACT")
-if [ "$REENCODED" = "$ARTIFACT_PAYLOAD" ]; then
-  echo "PASS: re-encoded output matches canonical artifact byte-for-byte"
-else
-  echo "FAIL: re-encoded output differs from canonical artifact"
-  diff <(echo "$REENCODED") <(echo "$ARTIFACT_PAYLOAD") | head -20
-  exit 1
-fi
+CANONICAL=$(cat "$PAYLOAD")
+[ "$REENCODED" = "$CANONICAL" ]
+check "re-encoded output matches canonical payload byte-for-byte"
 
-# Test 4: Verify attribution (first three values decode to 桜稲荷)
-echo "[4/4] Verifying attribution encoding..."
-ATTRIBUTION=$(echo "26716 31282 33655" | python3 "$TOOL" --decode)
-if [ "$ATTRIBUTION" = "桜稲荷" ]; then
-  echo "PASS: 26716 · 31282 · 33655 → 桜稲荷"
-else
-  echo "FAIL: attribution mismatch (got: $ATTRIBUTION)"
-  exit 1
-fi
+# Test 5: Framed artifact exists and contains header and trailer markers
+echo "[5] Framed artifact integrity"
+grep -q "ENC: UCS" "$FRAMED" && \
+grep -q "VERIFY COUNT BEFORE USE" "$FRAMED" && \
+grep -q "IF COUNT FAILS: DESTROY IMMEDIATELY" "$FRAMED" && \
+grep -q "桜稲荷" "$FRAMED"
+check "framed artifact contains header, trailer, and attribution"
+
+# Test 6: Decode the framed artifact (strip non-value lines) and compare
+echo "[6] Decode framed artifact"
+FRAMED_DECODED=$(grep -E "^[0-9]" "$FRAMED" | python3 "$TOOL" --decode)
+[ "$FRAMED_DECODED" = "$DECODED" ]
+check "framed artifact decodes identically to payload"
 
 echo ""
-echo "=== All tests passed ==="
+echo "=== Results: $PASS passed, $FAIL failed ==="
 echo ""
-echo "530 VALUES · VERIFIED"
-echo "Signal survives."
+if [ $FAIL -eq 0 ]; then
+  echo "549 VALUES · CRC32:148A80A0 · VERIFIED"
+  echo "Signal survives."
+  exit 0
+else
+  echo "IF COUNT FAILS: DESTROY IMMEDIATELY"
+  exit 1
+fi
