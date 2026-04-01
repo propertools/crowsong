@@ -34,7 +34,7 @@ Abstract
    message without software.  This property is a design requirement,
    not a fallback.
 
-   FDS is the L2 encoding layer of the Crowsong Suite [RSS].  It
+   FDS is the L2 encoding layer of the Crowsong Suite [CROWSONG].  It
    may also be used independently for point-to-point messaging over
    any channel capable of carrying decimal digits.
 
@@ -188,7 +188,7 @@ Table of Contents
 1.4.  Relationship to the Crowsong Suite
 
    FDS is specified as the L2 encoding layer of the Crowsong
-   Suite [RSS].  In that context, FDS provides the convergence
+   Suite [CROWSONG].  In that context, FDS provides the convergence
    layer enabling DTN bundles [RFC4838] [RFC9171] to be carried
    over non-binary channels.
 
@@ -305,7 +305,7 @@ Table of Contents
 
    FDS-FRAME is OPTIONAL for standalone point-to-point use.
    FDS-FRAME is REQUIRED when FDS is used as a Crowsong Suite
-   convergence layer (per [RSS]) or when carrying trust primitives
+   convergence layer (per [CROWSONG]) or when carrying trust primitives
    at L4.
 
    CRC-32 provides detection of accidental transmission errors.
@@ -455,7 +455,7 @@ Table of Contents
    FDS decoding when the B64 flag is present.
 
    Rationale: Binary content cannot be safely transmitted over
-   Class B, C, or D channels (per [RSS] channel classification).
+   Class B, C, or D channels (per [CROWSONG] channel classification).
    base64url encoding converts binary to a text-safe form; FDS
    encoding then converts that text to a decimal form suitable
    for all channel classes including Class D (human relay).
@@ -670,7 +670,7 @@ Table of Contents
    [RFC4880]  Callas, J. et al., "OpenPGP Message Format",
               RFC 4880, November 2007.
 
-   [RSS]      Darley, T., "The Crowsong Suite",
+   [CROWSONG]      Darley, T., "The Crowsong Suite",
               draft-darley-crowsong-00, work in progress.
 
    [SHARD]    Darley, T., "SHARD-BUNDLE and MIRROR-ATTESTATION",
