@@ -92,7 +92,7 @@ The format degrades gracefully because degraded channels are the point.
 
 ### The Unicode quick reference table
 
-`archive/fds-unicode-reference.txt` is a 314-line (π × 100)
+`docs/fds-unicode-reference.txt` is a 314-line (π × 100)
 human-readable reference covering eight sections:
 
 ```
