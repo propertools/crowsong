@@ -127,6 +127,20 @@ Self-description supports verification, recovery, and continuity.
 
 ---
 
+## Principle 11: Optionality is a design problem, not a keyword.
+
+SHOULD is a design smell.
+
+When a specification reaches for SHOULD, it is usually avoiding one of two harder commitments: either the behaviour is required for interoperability and SHOULD be stated as MUST, or it is genuinely optional and should be extracted into a composable component with its own minimal specification.
+
+Vague recommendations accumulate. Implementors treat them as permission to skip. Systems drift apart.
+
+The discipline: when you find yourself writing SHOULD, stop. Ask whether this is a MUST that lacks the courage to declare itself, or an optional capability that deserves its own coherent spec. If it is genuinely advisory — operational wisdom that cannot be mandated — say so plainly in prose. Do not hide it in a keyword.
+
+There is no SHOULD. There is MUST, MUST NOT, and design work still to be done.
+
+---
+
 A contribution is useful if it makes the system more likely to carry a signal across a gap.
 
 That is the test.
