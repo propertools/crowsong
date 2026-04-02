@@ -86,10 +86,57 @@ Signal survives.
 
 # Decode the canonical test vector
 cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
-  python3 tools/ucs-dec/ucs_dec_tool.py --decode
+  python tools/ucs-dec/ucs_dec_tool.py --decode
 
-# Verify
+# Regenerate canonical test vector payload
+python tools/ucs-dec/ucs_dec_tool.py -e \
+  < archive/second-law-blues.txt \
+  > archive/flash-paper-SI-2084-FP-001-payload.txt
+
+# Regenerate framed canonical test vector artifact
+python tools/ucs-dec/ucs_dec_tool.py -e \
+  --frame --ref SI-2084-FP-001 --med FLASH --attribution '桜稲荷' \
+  < archive/second-law-blues.txt \
+  > archive/flash-paper-SI-2084-FP-001-framed.txt
+
+# Roundtrip check canonical test vector
+python tools/ucs-dec/ucs_dec_tool.py -e \
+  < archive/second-law-blues.txt | \
+  diff - archive/flash-paper-SI-2084-FP-001-payload.txt
+# Expected: silence
+
+# Verify the framed canonical test vector artifact
+python tools/ucs-dec/ucs_dec_tool.py -v \
+  < archive/flash-paper-SI-2084-FP-001-framed.txt
+# Expected: 531 OK, E8DC9BF3 OK
+
+# Verify full test suite
 bash tests/roundtrip/run_tests.sh
+=== Crowsong FDS Roundtrip Test Suite ===
+    Artifact: SI-2084-FP-001
+
+[1] Decode canonical payload
+  PASS: decoded output is non-empty (543 bytes)
+[2] Attribution encoding (first three values → 桜稲荷)
+  PASS: 26716 · 31282 · 33655 → 桜稲荷
+[3] Verify token count and format
+  PASS: zero invalid tokens
+[4] Roundtrip encode/diff
+  PASS: re-encoded output matches canonical payload byte-for-byte
+[5] Framed artifact structural integrity
+  PASS: framed artifact contains header, trailer, and attribution
+[6] Framed artifact frame verification (count + CRC32)
+  PASS: declared 531 VALUES · CRC32:E8DC9BF3 — verified
+[7] Decode framed artifact (frame-aware)
+  PASS: framed artifact decodes identically to bare payload
+[8] Corruption detection
+  PASS: corrupted artifact correctly rejected (non-zero exit)
+
+=== Results: 8 passed, 0 failed ===
+
+531 VALUES · CRC32:E8DC9BF3 · VERIFIED
+Signal survives.
+
 ```
 
 ---
