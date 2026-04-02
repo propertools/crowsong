@@ -31,7 +31,7 @@ L5  Content    →  Meridian Protocol
 L4  Trust      →  SHARD-BUNDLE · MIRROR-ATTESTATION
 L3  Routing    →  Delay-Tolerant Networking (RFC 4838)
 L2  Encoding   →  Fox Decimal Script (FDS / UCS-DEC)
-L1  Physical   →  LoRa · Morse · Fax · RF · Print · Human relay
+L1  Physical   →  LoRa · Morse · Fax · RF · Kite-borne relay · Print · Human relay
 ```
 
 ---
