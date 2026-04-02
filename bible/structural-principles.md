@@ -6,7 +6,7 @@
 
 These principles govern the design of the Crowsong stack, the Meridian Protocol, and related continuity infrastructure.
 
-They describe architectural commitments, not implementation details.
+They describe architectural commitments rather than implementation details.
 
 ---
 
@@ -29,7 +29,10 @@ Infrastructure fails asymmetrically and unpredictably. Internet exchange points 
 
 The normal case usually takes care of itself.
 
-Systems that matter should be designed first for degraded, disrupted, or adversarial conditions. The edge case is where architecture reveals itself.
+Systems that matter should be designed first for degraded, disrupted, or adversarial conditions.
+
+The normal case rarely requires special handling.
+The edge case is where architecture reveals itself.
 
 ---
 
@@ -53,7 +56,7 @@ Human legibility is not nostalgia. It is a resilience property.
 
 ---
 
-## Principle 4: Encoding determines survivability.
+## Principle 4: Encoding is part of the resilience model.
 
 When the fundamental operations of a system can be performed by a human using a lookup table or equivalent reference, the system can survive the loss of complex tooling.
 
@@ -126,9 +129,6 @@ Self-description supports verification, recovery, and continuity.
 
 A contribution is useful if it makes the system more likely to carry a signal across a gap.
 
-```
+That is the test.
 
 ---
-
-You’re establishing doctrine.
-```
