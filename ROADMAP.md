@@ -1,197 +1,92 @@
-# Crowsong — FDS `-01` Roadmap
+# Crowsong — Roadmap
 
-*Working document — defines scope and execution plan for `draft-darley-fds-01`*
-
----
-
-## Status
-
-`-00` is tagged.
-
-This document defines what goes into `-01`, what is explicitly deferred,
-and what constitutes a complete release.
+*Working document — updated as scope is confirmed.*
 
 ---
 
 ## Design intent
 
-`-01` is not an expansion release. It is a **coherence release**.
+This is not a feature list. It is a sequencing discipline.
 
-The goal is to eliminate the gap between:
+Each horizon has a single governing constraint:
 
-* what the specification claims, and
-* what the reference implementation actually does.
-
-Where new functionality is introduced, it is because the system is
-incomplete without it.
-
----
-
-## Scope
-
-### Implementation (normative alignment)
-
-#### 1. NFC normalisation in `encode()`
-
-Add:
-
-```python
-unicodedata.normalize("NFC", text)
-```
-
-as the first operation in `encode()`.
-
-**Rationale:** Required for canonical reproducibility and compliance
-with Section 2.1.
+| Horizon | Constraint |
+|---------|-----------|
+| Near (`-01`) | Make the system honest: what is specified must exist |
+| Mid (`-02`) | Make the system complete: what is implied must be specified |
+| Far (future drafts) | Make the system extensible: what is needed must be designed |
 
 ---
 
-#### 2. Full FDS-FRAME parser
+## Near horizon — `draft-darley-fds-01`
 
-Implement frame-aware decoding and verification per Section 8.1.
+**Theme: coherence release.** Close the gap between spec and implementation.
 
-**Capabilities:**
+No expansion. New functionality only where the system is incomplete without it.
 
-* Parse `ENC:` header
-* Extract `WIDTH`, `COL`, `PAD` (apply defaults if absent)
-* Detect and parse optional `SIG:` line
-* Use extracted parameters during decode (no hardcoded defaults)
-* Verify value count and CRC32 (over encoded payload string)
-* Enforce `IF COUNT FAILS: DESTROY IMMEDIATELY`
+### Implementation
 
-**CLI considerations:**
+| # | Item | Rationale |
+|---|------|-----------|
+| 1 | NFC normalisation in `encode()` | Required for canonical reproducibility; compliance with §2.1 |
+| 2 | Frame-aware FDS-FRAME parser | Primary gap between spec and tool; §8.1 steps 1 and 4 |
+| 3 | Frame-aware `--decode` | Must use extracted WIDTH/COL/PAD, not hardcoded defaults |
+| 4 | `--verify` enforcement | Count + CRC32 + DESTROY semantics per §3.4 |
+| 5 | WIDTH/3 BINARY mode | Implement alongside spec section; Class D channel requirement |
 
-* Introduce `--strict`, or
-* Extend `--verify` + `--frame` interaction
+**CLI decision:** resolve before test suite work begins.  
+Introduce `--strict`, or extend `--verify` + `--frame` interaction.
 
-Decision must be made at the start of Phase 1, before test suite work
-begins.
+**Full cycle requirement:**  
+`--frame` → `--decode` → diff must round-trip cleanly and be explicitly tested.
 
-**Full cycle requirement:** Once the frame parser exists, the tool must
-support the complete generate-and-parse cycle. `--frame` produces a
-framed artifact; `--decode` on that artifact must recover the original
-payload exactly. This must be explicitly tested.
+### Specification
 
-**Rationale:** This is the primary gap between spec and tool.
+| # | Item | Rationale |
+|---|------|-----------|
+| 6 | Resource fork (minimal) | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
+| 7 | WIDTH/3 BINARY mode | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes |
+| 8 | Housekeeping pass | Cross-references, implementation section, transport matrix |
 
----
+### Cross-document
 
-#### 3. Test suite expansion
+| # | Item | Target draft |
+|---|------|-------------|
+| 9 | Human coordination layer | `draft-darley-crowsong-01` |
 
-Add:
+Covers: talking stick model, priority signalling (EMERGENCY / URGENT / ROUTINE), distributed moderation, operator attestation.  
+Status: informative section, 1–2 pages.
 
-* NFC normalisation stability test
-* Frame-aware roundtrip test: `--frame` → `--decode` → diff against
-  source (exercises full generate-and-parse cycle)
-* `--verify` correctness on framed artifacts (count + CRC32)
-* Corruption test: non-zero exit when DESTROY flag present and
-  verification fails
-* Confirm canonical test vector unchanged post-NFC
+### Test suite additions
 
----
+- NFC normalisation stability (canonical vector must be unchanged)
+- Full generate-and-parse cycle (`--frame` → `--decode` → diff)
+- `--verify` on framed artifacts (count + CRC32)
+- Corruption test (DESTROY flag present, verification fails → non-zero exit)
 
-### Specification (targeted additions)
+### Definition of done
 
-#### 4. Resource fork (minimal viable spec)
+- [ ] NFC normalisation implemented and tested
+- [ ] Frame parser implemented; `--decode` uses extracted parameters
+- [ ] Full generate-and-parse cycle tested
+- [ ] `--verify` enforces count + CRC32 + DESTROY semantics
+- [ ] Test suite expanded and passing
+- [ ] Canonical artifacts verified unchanged post-NFC
+- [ ] Resource fork section complete
+- [ ] WIDTH/3 BINARY section and implementation complete
+- [ ] Human coordination section added to Crowsong draft
+- [ ] Cross-references verified
+- [ ] RFC `.txt` regenerated
+- [ ] Tag: `v0.1-crowsong-01`
 
-Introduce a minimal resource fork definition:
+### Execution plan
 
-* `RSRC: BEGIN` / `RSRC: END`
-* Dependency-based ordering rule:
-  * resource-first when data fork is not independently decodable
-  * data-first when data fork is independently decodable
-* Interrupted transmission guarantees for each ordering case
-* Physical mapping:
-  * data fork → payload pages
-  * resource fork → context page
-
-Ordering is determined by dependency, not convention. This is the key
-insight and should be stated plainly before the formal spec language.
-
-**Constraint:** Keep this tight. Full FDS-FTP is deferred.
-
----
-
-#### 5. WIDTH/3 BINARY mode
-
-Add binary encoding mode:
-
-* 1 byte → 3-digit decimal (000–255)
-* `BINARY` flag in `ENC:` header
-* Decoder outputs raw bytes (no `chr()`)
-* Implement in tool alongside the spec section
-
-**Rationale:**
-
-* Reduces operator burden on Class D channels (Morse, human relay)
-* Avoids Base64 symbol complexity
-* Aligns with FDS philosophy: decimal-only survivability
-
----
-
-#### 6. Spec housekeeping
-
-* Fix section cross-references
-* Update reference implementation section to reflect NFC and frame
-  parsing
-* Extend transport compatibility matrix to include BINARY mode
-
----
-
-### Cross-document addition
-
-#### 7. Human coordination layer *(Crowsong draft, not FDS)*
-
-Add to `draft-darley-crowsong-01`:
-
-* Talking stick model
-* Priority signalling: EMERGENCY / URGENT / ROUTINE
-* Distributed moderation
-* Operator attestation signals
-
-**Status:** Informative section (1–2 pages).
-
----
-
-## Explicitly deferred
-
-These are valid. They are not `-01` work.
-
-* Full FDS-FTP (multipart, resumability, retransmission)
-* MIME type quick reference appendix
-* Aeolian Layer draft (`draft-darley-aeolian-dtn-arch-01`)
-* Story infrastructure (`story/ghost-line.md`, prose PR model) —
-  develop in parallel, not as a release dependency
-
----
-
-## Definition of done
-
-Before tagging `-01`:
-
-* [ ] NFC normalisation implemented
-* [ ] Frame parser implemented; `--decode` uses extracted parameters
-* [ ] Full generate-and-parse cycle tested (`--frame` → `--decode` → diff)
-* [ ] `--verify` enforces count + CRC32 + DESTROY semantics
-* [ ] Test suite expanded and passing
-* [ ] Canonical artifacts verified unchanged post-NFC
-* [ ] Resource fork section complete
-* [ ] WIDTH/3 BINARY section and implementation complete
-* [ ] Human coordination section added to Crowsong draft
-* [ ] Cross-references verified
-* [ ] RFC `.txt` regenerated
-* [ ] Tag created (`v0.1-crowsong-01`)
-
----
-
-## Execution plan
-
-```
+```text
 Phase 1 — Implementation (~3 hours)
-  Resolve --strict / --verify CLI decision
+  Resolve CLI decision (--strict vs --verify + --frame)
   NFC normalisation
-  Frame parser
-  Full cycle test (--frame -> --decode -> diff)
+  Frame parser + frame-aware --decode
+  Full cycle test
   Test suite updates
   Verify canonical artifacts unchanged
 
@@ -202,29 +97,80 @@ Phase 2 — Specification (~2 hours)
 
 Phase 3 — Crowsong integration (~1 hour)
   Human coordination layer
-  Terminology alignment
+  Terminology alignment with fds-01
 
 Phase 4 — Release (~30 min)
-  RFC generation
+  RFC .txt regeneration
   README updates
-  Tagging
+  Tag
+````
+
+---
+
+## Mid horizon — `draft-darley-fds-02` and peers
+
+**Theme: completeness release.** Specify what the near horizon implies but defers.
+
+| Item                                          | Notes                                                                                                       |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Full FDS-FTP spec                             | Multipart, resumability, retransmission request format                                                      |
+| MIME type quick reference appendix            | Companion to FDS Unicode reference table                                                                    |
+| Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery                                                 |
+| Story infrastructure                          | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
+| Aeolian Layer draft                           | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline                                     |
+
+---
+
+## Far horizon — future drafts
+
+**Theme: extensibility.** Design what the system will need to become.
+
+### FDS Fax Page Profile
+
+**Target:** `draft-darley-fds-fax-profile-00`
+
+**Functional requirement:**
+
+```text
+# Sender
+tar czf - ./spec/ | <encode> > pages.tiff && fax send pages.tiff
+
+# Receiver
+fax receive > pages.tiff && <decode> pages.tiff | tar xzf -
 ```
 
+Two pipelines. Two fax machines. Two pairs of sneakers. No intermediate manual steps.
+
+**Design constraints:**
+
+* G3/G4 fax is lossy on fine detail; visual encoding must survive fax compression artifacts
+* Encoding must remain human-legible as fallback; a pure QR code does not satisfy this
+* Recovery via image-to-text, not full OCR
+* Row-level checksums for partial recovery across damaged or reordered pages
+* Resource fork travels as separate fax page or cover sheet per ordering rules
+
+**Proposed elements:**
+
+* Fixed-width decimal grid at specified point size and page margin
+* Alignment marks (corners + midpoints) for image registration
+* Row number and row CRC32 in margin
+* Page number and artifact REF in header
+* WIDTH/3 BINARY as encoding mode for binary payloads
+* Reed-Solomon redundancy across rows and pages
+
+**Dependencies:**
+
+* WIDTH/3 BINARY (`fds-01`)
+* Resource fork spec (`fds-01`)
+* Physical page layout tooling (new)
+* Image-to-grid decoder (new)
+
 ---
 
-## Notes
+## One-line summaries
 
-* The reference implementation remains intentionally minimal, but must
-  no longer contradict the spec.
-* Resource fork ordering is the key conceptual addition: dependency
-  determines ordering, not convention.
-* WIDTH/3 BINARY should be implemented alongside its specification, not
-  after.
-* Story-driven engagement (Ghost Line, prose PR model) should be
-  scaffolded in parallel with `-01` work, not gated on the tag.
-
----
-
-## One-line summary
-
-`-01` makes the system honest: what is specified is what exists.
+| Horizon | Summary                           |
+| ------- | --------------------------------- |
+| `-01`   | What is specified must exist      |
+| `-02`   | What is implied must be specified |
+| Far     | What is needed must be designed   |
