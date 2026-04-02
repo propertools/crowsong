@@ -26,52 +26,59 @@ No expansion. New functionality only where the system is incomplete without it.
 
 ### Implementation
 
-| # | Item | Rationale |
-|---|------|-----------|
-| 1 | NFC normalisation in `encode()` | Required for canonical reproducibility; compliance with §2.1 |
-| 2 | Frame-aware FDS-FRAME parser | Primary gap between spec and tool; §8.1 steps 1 and 4 |
-| 3 | Frame-aware `--decode` | Must use extracted WIDTH/COL/PAD, not hardcoded defaults |
-| 4 | `--verify` enforcement | Count + CRC32 + DESTROY semantics per §3.4 |
-| 5 | WIDTH/3 BINARY mode | Implement alongside spec section; Class D channel requirement |
+| # | Item | Status | Rationale |
+|---|------|--------|-----------|
+| 1 | NFC normalisation in `encode()` | ✅ done (`-00`) | Required for canonical reproducibility; compliance with §2.1 |
+| 2 | Frame-aware FDS-FRAME parser | ✅ done (`-00`) | Primary gap between spec and tool; §8.1 steps 1 and 4 |
+| 3 | Frame-aware `--decode` | ✅ done (`-00`) | Uses extracted WIDTH/COL/PAD, not hardcoded defaults |
+| 4 | `--verify` enforcement | ✅ done (`-00`) | Count + CRC32 + DESTROY semantics per §3.4 |
+| 5 | WIDTH/3 BINARY mode | ⬜ todo | Implement alongside spec section; Class D channel requirement |
 
-**CLI decision:** resolve before test suite work begins.  
-Introduce `--strict`, or extend `--verify` + `--frame` interaction.
+**CLI decision:** resolved. Frame awareness is automatic in `--decode` and
+`--verify`; no `--strict` flag needed.
 
-**Full cycle requirement:**  
-`--frame` → `--decode` → diff must round-trip cleanly and be explicitly tested.
+**Full cycle requirement:** ✅ verified — `--frame` → `--decode` → diff
+round-trips cleanly; tested in suite.
 
 ### Specification
 
-| # | Item | Rationale |
-|---|------|-----------|
-| 6 | Resource fork (minimal) | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
-| 7 | WIDTH/3 BINARY mode | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes |
-| 8 | Housekeeping pass | Cross-references, implementation section, transport matrix |
+| # | Item | Status | Rationale |
+|---|------|--------|-----------|
+| 6 | Resource fork (minimal) | ⬜ todo | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
+| 7 | WIDTH/3 BINARY mode | ⬜ todo | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes |
+| 8 | Structural Principles: Principle 11 | ✅ done (`-00`) | SHOULD as design smell; optionality via composable components |
+| 9 | Housekeeping pass | ⬜ todo | Cross-references, implementation section, transport matrix |
 
 ### Cross-document
 
-| # | Item | Target draft |
-|---|------|-------------|
-| 9 | Human coordination layer | `draft-darley-crowsong-01` |
+| # | Item | Status | Target draft |
+|---|------|--------|-------------|
+| 10 | Human coordination layer | ⬜ todo | `draft-darley-crowsong-01` |
 
-Covers: talking stick model, priority signalling (EMERGENCY / URGENT / ROUTINE), distributed moderation, operator attestation.  
+Covers: talking stick model, priority signalling (EMERGENCY / URGENT / ROUTINE),
+distributed moderation, operator attestation.
 Status: informative section, 1–2 pages.
 
-### Test suite additions
+### Test suite
 
-- NFC normalisation stability (canonical vector must be unchanged)
-- Full generate-and-parse cycle (`--frame` → `--decode` → diff)
-- `--verify` on framed artifacts (count + CRC32)
-- Corruption test (DESTROY flag present, verification fails → non-zero exit)
+| Test | Status |
+|------|--------|
+| NFC normalisation stability | ✅ done (`-00`) |
+| Full generate-and-parse cycle (`--frame` → `--decode` → diff) | ✅ done (`-00`) |
+| `--verify` on framed artifacts (count + CRC32) | ✅ done (`-00`) |
+| Corruption test (DESTROY flag + verification failure → non-zero exit) | ✅ done (`-00`) |
+| WIDTH/3 BINARY roundtrip | ⬜ todo |
+| Resource fork roundtrip | ⬜ todo |
 
 ### Definition of done
 
-- [ ] NFC normalisation implemented and tested
-- [ ] Frame parser implemented; `--decode` uses extracted parameters
-- [ ] Full generate-and-parse cycle tested
-- [ ] `--verify` enforces count + CRC32 + DESTROY semantics
-- [ ] Test suite expanded and passing
-- [ ] Canonical artifacts verified unchanged post-NFC
+- [x] NFC normalisation implemented and tested
+- [x] Frame parser implemented; `--decode` uses extracted parameters
+- [x] Full generate-and-parse cycle tested
+- [x] `--verify` enforces count + CRC32 + DESTROY semantics
+- [x] Test suite expanded and passing
+- [x] Canonical artifacts verified unchanged post-NFC
+- [x] Structural Principles updated (Principle 11)
 - [ ] Resource fork section complete
 - [ ] WIDTH/3 BINARY section and implementation complete
 - [ ] Human coordination section added to Crowsong draft
@@ -82,17 +89,16 @@ Status: informative section, 1–2 pages.
 ### Execution plan
 
 ```text
-Phase 1 — Implementation (~3 hours)
-  Resolve CLI decision (--strict vs --verify + --frame)
-  NFC normalisation
-  Frame parser + frame-aware --decode
-  Full cycle test
-  Test suite updates
-  Verify canonical artifacts unchanged
+Phase 1 — Implementation (complete)
+  ✅ NFC normalisation
+  ✅ Frame parser + frame-aware --decode
+  ✅ Full cycle test
+  ✅ Test suite updates
+  ✅ Canonical artifacts verified unchanged
 
 Phase 2 — Specification (~2 hours)
   Resource fork section
-  WIDTH/3 BINARY section
+  WIDTH/3 BINARY section + implementation
   Housekeeping pass
 
 Phase 3 — Crowsong integration (~1 hour)
@@ -103,7 +109,7 @@ Phase 4 — Release (~30 min)
   RFC .txt regeneration
   README updates
   Tag
-````
+```
 
 ---
 
@@ -111,13 +117,13 @@ Phase 4 — Release (~30 min)
 
 **Theme: completeness release.** Specify what the near horizon implies but defers.
 
-| Item                                          | Notes                                                                                                       |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Full FDS-FTP spec                             | Multipart, resumability, retransmission request format                                                      |
-| MIME type quick reference appendix            | Companion to FDS Unicode reference table                                                                    |
-| Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery                                                 |
-| Story infrastructure                          | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
-| Aeolian Layer draft                           | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline                                     |
+| Item | Notes |
+|------|-------|
+| Full FDS-FTP spec | Multipart, resumability, retransmission request format |
+| MIME type quick reference appendix | Companion to FDS Unicode reference table |
+| Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery |
+| Story infrastructure | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
+| Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
 
 ---
 
@@ -169,8 +175,8 @@ Two pipelines. Two fax machines. Two pairs of sneakers. No intermediate manual s
 
 ## One-line summaries
 
-| Horizon | Summary                           |
-| ------- | --------------------------------- |
-| `-01`   | What is specified must exist      |
-| `-02`   | What is implied must be specified |
-| Far     | What is needed must be designed   |
+| Horizon | Summary |
+|---------|---------|
+| `-01` | What is specified must exist |
+| `-02` | What is implied must be specified |
+| Far | What is needed must be designed |
