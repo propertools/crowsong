@@ -94,6 +94,10 @@ echo "Signal survives." | python3 tools/ucs-dec/ucs_dec_tool.py --encode
 echo "00083 00105 00103 00110 00097 00108" | \
   python3 tools/ucs-dec/ucs_dec_tool.py --decode
 
+# Decode the canonical test vector
+cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
+  python3 tools/ucs-dec/ucs_dec_tool.py --decode
+
 # Run roundtrip tests
 bash tests/roundtrip/run_tests.sh
 ```
