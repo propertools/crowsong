@@ -5,10 +5,10 @@
 
 set -e
 
-TOOL="../../tools/ucs-dec/ucs_dec_tool.py"
-RAW="../../archive/second-law-blues-raw.txt"
-PAYLOAD="../../archive/flash-paper-SI-2084-FP-001-payload.txt"
-FRAMED="../../archive/flash-paper-SI-2084-FP-001-framed.txt"
+TOOL="./tools/ucs-dec/ucs_dec_tool.py"
+RAW="./archive/second-law-blues.txt"
+PAYLOAD="./archive/flash-paper-SI-2084-FP-001-payload.txt"
+FRAMED="./archive/flash-paper-SI-2084-FP-001-framed.txt"
 
 PASS=0
 FAIL=0
@@ -37,7 +37,7 @@ check "decoded output is non-empty ($(echo "$DECODED" | wc -c) bytes)"
 echo "[2] Attribution encoding (first three values → 桜稲荷)"
 ATTR=$(head -1 "$PAYLOAD" | awk '{print $1, $2, $3}' | python3 "$TOOL" --decode)
 [ "$ATTR" = "桜稲荷" ]
-check "26716 · 31282 · 31282 → 桜稲荷"
+check "26716 · 31282 · 33655 → 桜稲荷"
 
 # Test 3: Verify token count and validity
 echo "[3] Verify token count and format"
@@ -69,7 +69,7 @@ echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 echo ""
 if [ $FAIL -eq 0 ]; then
-  echo "549 VALUES · CRC32:148A80A0 · VERIFIED"
+  echo "531 VALUES · CRC32:E8DC9BF3"
   echo "Signal survives."
   exit 0
 else
