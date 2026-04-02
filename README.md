@@ -75,11 +75,14 @@ bible/                        structural principles (design doctrine)
 
 ```bash
 # Encode
-echo "Signal survives." | python3 tools/ucs-dec/ucs_dec_tool.py --encode
+echo "Signal survives." | python tools/ucs-dec/ucs_dec_tool.py --encode
+00083  00105  00103  00110  00097  00108
+00032  00115  00117  00114  00118  00105
+00118  00101  00115  00046  00010  00000
 
 # Decode
-echo "00083 00105 00103 00110 00097 00108" | \
-  python3 tools/ucs-dec/ucs_dec_tool.py --decode
+echo "00083  00105  00103  00110  00097  00108 00032  00115  00117  00114  00118  00105 00118  00101  00115  00046  00010  00000" | python tools/ucs-dec/ucs_dec_tool.py --decode
+Signal survives.
 
 # Decode the canonical test vector
 cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
