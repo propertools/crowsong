@@ -2,7 +2,7 @@
 
 Reference implementation for `draft-darley-fds-00`.
 
-No dependencies beyond the Python 3 standard library.
+No dependencies beyond the Python 2.7 standard library.
 
 ---
 
