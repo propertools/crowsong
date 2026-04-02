@@ -112,8 +112,8 @@ IF COUNT FAILS: DESTROY IMMEDIATELY is not decorative.
 >
 > The channel between them could be a fax line in East Africa.
 > It could be TCP/IP over a piece of barbed wire.
-> It could be a human courier with a printed stack of pages.
-> It could be Morse.
+> It could be a human courier with a printed stack of flash paper.
+> It could be someone blinking Morse in a meeting.
 >
 > The stack does not care. The stack was designed for this.
 
