@@ -3,7 +3,7 @@
 *"Carry the signal forward."*
 
 - **Version:** 1.0
-- **Classification:** TLP:WHITE — this document may be shared freely
+- **Classification:** TLP:CLEAR — this document may be shared freely
 - **Author:** Vernon Olin Darley III / Proper Tools SRL
 - **Created:** 2026-03-16
 - **Status:** Active
@@ -26,7 +26,7 @@ The design priorities, in order:
 4. **Integrity** — the archive must be verifiable on recovery
 5. **Survivability** — partial degradation must not destroy the whole
 
-Confidentiality is not in this list. A Vesper archive is TLP:WHITE by design.
+Confidentiality is not in this list. A Vesper archive is TLP:CLEAR by design.
 If you need to bury secrets, encrypt them before archiving and include the
 decryption instructions in the archive itself. See the Mnemonic Shamir
 construction in `docs/mnemonic-shamir-sketch.md`.
@@ -364,4 +364,4 @@ Signal discipline. All the way down.
 
 *Vesper Archive Protocol v1.0*
 *Proper Tools SRL — propertools.be*
-*TLP:WHITE*
+*TLP:CLEAR*
