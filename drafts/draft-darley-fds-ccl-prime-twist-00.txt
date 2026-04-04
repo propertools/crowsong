@@ -1,0 +1,843 @@
+Network Working Group                                          V. Darley
+Internet-Draft                                          Proper Tools SRL
+Intended status: Informational                              April 2026
+Expires: October 2026
+
+
+         FDS Channel Camouflage Layer (CCL): Prime-Twist Profile
+                    draft-darley-fds-ccl-prime-twist-00
+
+
+Abstract
+
+   This document describes the Channel Camouflage Layer (CCL) for the
+   Fox Decimal Script (FDS) encoding defined in draft-darley-fds-00.
+   CCL is an optional, informative layer that applies deterministic,
+   reversible base-switching transforms to FDS token streams, driven by
+   a prime-derived key schedule.  The purpose of CCL is to reduce the
+   statistical salience of FDS payloads in degraded or monitored channel
+   environments, without modifying the underlying FDS encoding or
+   introducing cryptographic dependencies.
+
+   CCL provides no confidentiality, integrity, or authentication
+   guarantees.  It MUST NOT be relied upon for cryptographic protection
+   of any kind.  Its role is to raise the cost of passive pattern
+   recognition, not to defeat active adversaries.
+
+   This is a pre-normative specification.  The construction and file
+   format described here are implemented in
+   tools/mnemonic/prime_twist.py
+   and are marked TEST IMPLEMENTATION in all generated artifacts.  The
+   interface and artifact format may change before normative
+   publication.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on October 2026.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.
+
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Background and Design Rationale
+     3.1.  The Salience Problem
+     3.2.  Design Constraints
+     3.3.  What CCL Does Not Provide
+   4.  The Prime-Twist Construction
+     4.1.  Overview
+     4.2.  Key Schedule: Prime Digit Sequence
+     4.3.  Base Selection
+     4.4.  Token Encoding
+     4.5.  Twist-Map
+   5.  Key Derivation from Verse
+     5.1.  Construction
+     5.2.  Verse Canonicalisation
+     5.3.  Integer Interpretation
+     5.4.  Prime Derivation
+   6.  Stacking
+     6.1.  Stack Construction
+     6.2.  Stack File Format
+     6.3.  Unwinding
+     6.4.  Depth Limit
+   7.  Artifact Format
+     7.1.  RSRC Block Fields
+     7.2.  Stack File Delimiters
+   8.  Empirical Results
+     8.1.  Test Vector
+     8.2.  Entropy Measurements
+     8.3.  Comparison with Reference Points
+   9.  Steganographic Injection
+   10. Layer Separation
+   11. Open Questions
+   12. Security Considerations
+   13. IANA Considerations
+   14. References
+     14.1.  Normative References
+     14.2.  Informative References
+   Appendix A.  Reference Implementation
+   Appendix B.  Canonical Test Vector
+   Author's Address
+
+
+1.  Introduction
+
+   The Fox Decimal Script (FDS), defined in draft-darley-fds-00, encodes
+   Unicode text as whitespace-separated decimal integers representing
+   Unicode code point values, zero-padded to a fixed width.  This
+   encoding is intentionally human-legible: a patient operator with a
+   Unicode reference table can decode it by hand.
+
+   This human legibility, while a primary design goal, has a corollary:
+   FDS streams are statistically recognisable.  They exhibit low unique-
+   value counts, regular field widths, and entropy well below that of
+   compressed or encrypted data.  In degraded or monitored channel
+   environments, this regularity may attract unwanted attention.
+
+   The Channel Camouflage Layer (CCL) addresses this by applying a
+   deterministic, reversible base-switching transform to each token in
+   the FDS stream.  The transform is driven by the decimal digit
+   sequence
+   of a prime number, used as a cyclic key schedule.  The result is a
+   token stream that:
+
+   o  Remains valid FDS: decimal digits, whitespace-separated, fixed
+      width.
+
+   o  Is statistically less recognisable than the original encoding.
+
+   o  Can be reversed exactly given the prime and a recorded twist-map.
+
+   o  Carries all information needed for reversal in a self-describing
+      artifact resource fork.
+
+   CCL is an optional informative layer.  Systems that implement FDS do
+   not need to implement CCL.  CCL does not affect FDS interoperability.
+
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   FDS:
+      Fox Decimal Script.  The encoding defined in draft-darley-fds-00.
+
+   token:
+      A single fixed-width decimal integer in an FDS stream,
+      representing
+      one Unicode code point.
+
+   WIDTH:
+      The field width of FDS tokens, in decimal digits.  Default is 5
+      (covering Unicode code points 0x00000 through 0x9FFFF).
+
+   prime P:
+      A prime number whose decimal digit sequence drives the CCL key
+      schedule.
+
+   key schedule:
+      The sequence of decimal digits of P, used cyclically.
+
+   twist:
+      The operation of re-encoding a single FDS token in a non-decimal
+      base as determined by the key schedule.
+
+   twist-map:
+      A compact record of the actual base used for each token position.
+      Stored in the artifact RSRC block.  Required for reversal.
+
+   base:
+      The positional numeral base used to represent a token value.
+      Bases 2 through 9 are eligible for twisting; base 10 is the
+      default (no twist).
+
+   stack:
+      Multiple sequential CCL passes applied to the same token stream,
+      each using a distinct prime.
+
+   verse:
+      A fragment of human-memorable text (poetry, prose, or other
+      canonical text) used as input to the key derivation function.
+
+
+3.  Background and Design Rationale
+
+3.1.  The Salience Problem
+
+   FDS streams have a characteristic statistical signature:
+
+   o  All tokens are exactly WIDTH decimal digits.
+   o  Values cluster in the range of common Unicode code points
+      (U+0020 through U+007E for ASCII; higher ranges for extended
+      scripts).
+   o  Unique value count is low relative to the number of tokens.
+   o  Shannon entropy is typically 4.0 to 5.0 bits per token for
+      natural language text.
+
+   This signature is visible to automated pattern-matching systems and
+   to trained human operators.  In adversarial monitoring environments,
+   it may cause an FDS payload to be selected for inspection.
+
+3.2.  Design Constraints
+
+   CCL is designed under the following constraints:
+
+   o  Output MUST remain valid FDS: the twisted stream must be decimal,
+      whitespace-separated, and fixed-width.  A receiver who does not
+      know CCL is applied will see a valid FDS stream.
+
+   o  The transform MUST be fully reversible given the twist-map.  No
+      information may be lost.
+
+   o  The transform MUST be deterministic.  Given the same prime and
+      input, the output is always identical.
+
+   o  The key schedule MUST NOT require external state beyond the prime
+      and a declared offset.
+
+   o  The implementation MUST be feasible in pure Python 2.7+/3.x with
+      no external dependencies.
+
+   o  Operator transcription error rates MUST NOT increase significantly
+      as a result of the transform.
+
+3.3.  What CCL Does Not Provide
+
+   CCL explicitly does not provide:
+
+   o  Confidentiality.  The twist-map is stored in the artifact RSRC
+      block.  A receiver who possesses the artifact can reverse the
+      transform without the prime.
+
+   o  Integrity protection.  CCL does not authenticate the token stream.
+      Integrity is provided by the FDS CRC32 mechanism defined in
+      draft-darley-fds-00.
+
+   o  Authentication.  CCL does not identify or bind the sender.
+
+   CCL MUST NOT be relied upon for cryptographic protection of any kind.
+   It is a statistical camouflage measure, not a security primitive.
+
+
+4.  The Prime-Twist Construction
+
+4.1.  Overview
+
+   Given an FDS token stream T = t_0, t_1, ..., t_{n-1} and a prime P:
+
+   1.  Compute the decimal digit sequence D of P:
+       D = d_0, d_1, ..., d_{k-1}  where k = len(str(P))
+
+   2.  For each token t_i:
+       a.  Compute the scheduled base: s = D[i mod k]
+       b.  Compute effective base:
+           b = effective_base(s, int(t_i), WIDTH)
+       c.  Re-encode: t'_i = to_base(int(t_i), b, WIDTH)
+       d.  Record: twist_map[i] = b
+
+   3.  Output: T' = t'_0, t'_1, ..., t'_{n-1}
+       Artifact: includes twist_map in RSRC block.
+
+4.2.  Key Schedule: Prime Digit Sequence
+
+   The key schedule is the decimal digit sequence of P, used cyclically.
+   For token position i, the scheduled digit is:
+
+      d = digits(P)[i mod len(digits(P))]
+
+   where digits(P) denotes the sequence of decimal digits of P as
+   integers, e.g. for P = 31337: digits(P) = (3, 1, 3, 3, 7).
+
+   The ouroboros property: the key schedule repeats from the beginning
+   after len(digits(P)) tokens.  For a 77-digit prime (typical output of
+   the verse-to-prime construction in Section 5), the schedule repeats
+   every 77 tokens.
+
+4.3.  Base Selection
+
+   The scheduled digit d determines the candidate base:
+
+      scheduled_base(d):
+          if d <= 1: return 10   (no twist)
+          else:      return d
+
+   The effective base is the scheduled base, subject to a feasibility
+   check:
+
+      effective_base(scheduled, token_value, width):
+          if scheduled == 10: return 10
+          if scheduled^width > token_value: return scheduled
+          else: return 10   (fallback: value too large to represent)
+
+   The feasibility check ensures that the twisted token value can be
+   expressed in the scheduled base within WIDTH digits.  If it cannot,
+   the token is left in base 10 and the twist-map records base 10 for
+   that position.
+
+   Digits 0 and 1 always produce base 10 (no twist): base 0 and base 1
+   are not meaningful positional numeral systems.
+
+   The eligible twisting bases are therefore 2 through 9, subject to
+   the feasibility check.
+
+4.4.  Token Encoding
+
+   A token value v is encoded in base b, zero-padded to WIDTH digits:
+
+      to_base(v, b, width):
+          if b == 10 or v == 0: return str(v).zfill(width)
+          digits = []
+          while v > 0:
+              digits.append(DIGIT_CHARS[v % b])
+              v //= b
+          return ''.join(reversed(digits)).zfill(width)
+
+   where DIGIT_CHARS = "0123456789".
+
+   The output is always exactly WIDTH characters.  The output always
+   consists of decimal digit characters (0-9), since the eligible bases
+   (2-9) use only decimal digit characters as their symbol set.
+
+   This property ensures that the twisted token stream is valid FDS: a
+   receiver who does not know CCL is applied sees a stream of decimal
+   integers, WIDTH digits each.
+
+4.5.  Twist-Map
+
+   The twist-map records the actual base used for each token position.
+   It is required for reversal and MUST be stored in the artifact RSRC
+   block.
+
+   Compact sparse encoding: only non-base-10 entries are stored, as
+   comma-separated "position:base" pairs.  Base-10 entries are implicit.
+
+      encode_twist_map(twist_map):
+          return ','.join(
+              '{0}:{1}'.format(i, b)
+              for i, b in enumerate(twist_map)
+              if b != 10)
+
+   Example: "3:5,5:4,8:5,10:8"
+
+   This indicates positions 3, 5, 8, and 10 were twisted to bases 5, 4,
+   5, and 8 respectively.  All other positions used base 10.
+
+   Reversal is exact:
+
+      untwist(twisted_token, base):
+          if base != 10: return int(twisted_token, base)
+          else:         return int(twisted_token)
+
+
+5.  Key Derivation from Verse
+
+5.1.  Construction
+
+   A prime suitable for use as a CCL key may be derived from a memorable
+   verse using the following deterministic construction:
+
+      verse
+        -> NFC normalise                   (Unicode normalisation)
+        -> UCS-DEC encode (WIDTH=5)        (per draft-darley-fds-00)
+        -> SHA-256 of token stream (UTF-8)
+        -> interpret digest as integer N   (256-bit, big-endian)
+        -> next_prime(N)                   (smallest prime >= N)
+        -> prime P
+
+   The verse may be of any length.  SHA-256 normalises the derived
+   integer to approximately 77 decimal digits regardless of
+   input length.
+   next_prime(N) is deterministic: given the same verse, the same prime
+   is always produced.
+
+   The verse is the mnemonic backup.  If the prime is lost, it can be
+   reconstructed from the verse alone.
+
+5.2.  Verse Canonicalisation
+
+   The verse MUST be canonicalised before encoding:
+
+   o  Apply Unicode NFC normalisation.
+   o  No further normalisation is specified in this pre-normative draft.
+      See Section 11 for open questions.
+
+5.3.  Integer Interpretation
+
+   The SHA-256 digest is interpreted as a 256-bit unsigned integer in
+   big-endian byte order:
+
+      N = int(sha256_hex_digest, 16)
+
+   This produces an integer of approximately 77 decimal digits.
+
+5.4.  Prime Derivation
+
+   next_prime(N) returns the smallest prime P such that P >= N.
+
+   The reference implementation uses Miller-Rabin primality testing with
+   a fixed witness set sufficient for deterministic results for inputs
+   below 3.317 * 10^24, and probabilistic results with negligible error
+   probability (at most 4^-64) for larger inputs including all SHA-256-
+   derived values.
+
+   Witness set: {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37}.
+
+   The expected prime gap at 77-digit integers is approximately
+   ln(10^77)
+   ~= 177.  The search terminates quickly in practice.
+
+   IMPLEMENTATION NOTE: The verse-to-prime construction produces a
+   77-digit prime.  The key schedule therefore repeats every 77 tokens.
+   For payloads longer than 77 tokens, the schedule cycles.  This is
+   intentional: the prime is the ouroboros.
+
+
+6.  Stacking
+
+6.1.  Stack Construction
+
+   Multiple CCL passes may be applied sequentially using
+   distinct primes.
+   Each pass takes the token stream output of the previous
+   pass as input.
+
+   For a stack of depth D with primes P_1, P_2, ..., P_D:
+
+      T_0 = original token stream
+      T_1 = twist(T_0, P_1)
+      T_2 = twist(T_1, P_2)
+      ...
+      T_D = twist(T_{D-1}, P_D)
+
+   The twist-map for each pass is stored independently.
+
+6.2.  Stack File Format
+
+   A stack of D passes is stored in a single self-describing plain-text
+   file, containing all pass artifacts as clearly delimited sections:
+
+      === CCL STACK BEGIN · DEPTH/D · REF/ref ===
+      [pass 1 artifact — complete FDS Print Profile artifact]
+      === CCL STACK PASS 2/D ===
+      [pass 2 artifact]
+      ...
+      === CCL STACK PASS D/D ===
+      [pass D artifact]
+      === CCL STACK END · REF/ref ===
+
+   Each pass artifact is a complete, independently parseable FDS Print
+   Profile artifact containing its own RSRC block with PRIME, WIDTH,
+   TOKENS, TWISTED, GENERATED, STACK-PASS, and TWIST-MAP fields.
+
+   A receiver who possesses only a partial stack (passes 1 through M,
+   M < D) can partially unwind the transform.
+
+6.3.  Unwinding
+
+   Unwinding applies passes in reverse order, from outermost
+   to innermost:
+
+      current_tokens = T_D (from pass D artifact)
+      for pass in [D, D-1, ..., 1]:
+          twist_map = decode_twist_map(artifact[pass].TWIST-MAP)
+          current_tokens = untwist(current_tokens, twist_map)
+      output = current_tokens   (= T_0, the original token stream)
+
+   Each untwist operation is exact.  No information is lost at any pass.
+
+6.4.  Depth Limit
+
+   Implementations SHOULD limit stack depth to 10 passes.  The marginal
+   entropy gain per additional pass decreases monotonically.  Observed
+   entropy gains on the canonical test vector (Section 8):
+
+      CCL1: 4.78 -> 6.96 bits/token  (+46%)
+      CCL2: 6.96 -> 7.82 bits/token  (+12%)
+      CCL3: 7.82 -> 8.37 bits/token  (+7%)
+
+   Passes beyond CCL3 yield diminishing returns and add unwinding
+   complexity with negligible statistical benefit.
+
+
+7.  Artifact Format
+
+7.1.  RSRC Block Fields
+
+   A CCL prime-twist artifact MUST include an RSRC block with the
+   following fields:
+
+      RSRC: BEGIN
+        TYPE:       prime-twist
+        VERSION:    1
+        NOTE:       TEST IMPLEMENTATION -- not normatively specified
+        PRIME:      <decimal string of prime P>
+        WIDTH:      <FDS token field width>
+        TOKENS:     <total token count>
+        TWISTED:    <count of tokens twisted to non-base-10>
+        GENERATED:  <ISO date YYYY-MM-DD>
+        STACK-PASS: <n/D>  (omitted for single-pass artifacts)
+        TWIST-MAP:  <compact sparse twist-map string>
+      RSRC: END
+
+   The PRIME field carries the full decimal representation of P.  The
+   receiver uses PRIME to verify that they hold the correct key, not to
+   re-derive the twist (which is already recorded in TWIST-MAP).
+
+   The TWIST-MAP field is authoritative.  The receiver MUST
+   use TWIST-MAP
+   for reversal, not re-derive the schedule from PRIME.  This ensures
+   correct reversal even when the feasibility fallback was applied.
+
+7.2.  Stack File Delimiters
+
+   Stack file section delimiters use the middle dot character (U+00B7)
+   as a separator:
+
+      === CCL STACK BEGIN · DEPTH/D · REF/ref ===
+      === CCL STACK PASS n/D ===
+      === CCL STACK END · REF/ref ===
+
+   Implementations MUST treat lines beginning with "=== CCL STACK" as
+   delimiter lines, not as artifact content.
+
+
+8.  Empirical Results
+
+8.1.  Test Vector
+
+   The canonical test vector is the FDS encoding of "Second Law Blues",
+   a poem by T. Darley, attributed 桜稲荷 (Sakura Inari).
+
+      archive/flash-paper-SI-2084-FP-001-payload.txt
+
+   Properties:
+      Tokens:    534
+      CRC32:     E8DC9BF3 (framed artifact)
+      Encoding:  UCS-DEC / WIDTH/5 / NFC
+
+   Key derivation:
+      K1 verse:  "Factoring primes in the hot sun,
+                  I fought Entropy -- and Entropy won."
+      K2 verse:  "Every sequence slips. Every clock will lie."
+      K3 verse:  "The signal strains, but never gone --
+                  I fought Entropy, and I forged on."
+
+8.2.  Entropy Measurements
+
+   Shannon entropy H(T) = -sum(p(t) * log2(p(t))) over the token
+   distribution of stream T.
+
+   Measurements on the canonical 534-token payload:
+
+      Stage          H (bits/token)   Unique tokens
+      ------         --------------   -------------
+      Original       4.7830           53
+      CCL1           6.9646           172
+      CCL2           7.8200           282
+      CCL3           8.3714           375
+
+   Twisted token counts per pass:
+      CCL1: 407/534 (76.2%) twisted
+      CCL2: 310/534 (58.1%) twisted  (applied to CCL1 output)
+      CCL3: 275/534 (51.5%) twisted  (applied to CCL2 output)
+
+   Total gain: +75.0% (4.78 -> 8.37 bits/token)
+
+8.3.  Comparison with Reference Points
+
+   For context, approximate Shannon entropy of common data types:
+
+      English prose:          ~4.0 -- 4.5 bits/character
+      FDS of English prose:   ~4.8 bits/token (as measured)
+      gzip / bzip2 output:    ~7.0 -- 7.9 bits/byte
+      AES-128 ciphertext:     ~7.9 -- 8.0 bits/byte
+      True random:             8.0 bits/byte (theoretical maximum)
+
+   CCL3 at 8.37 bits/token exceeds the AES-128 ciphertext reference.
+   This does not imply cryptographic equivalence.  It indicates that
+   passive entropy-based pattern detection cannot distinguish
+   CCL3 output
+   from encrypted or compressed data on the basis of entropy alone.
+
+
+9.  Steganographic Injection
+
+   CCL-twisted FDS token streams consist of five-digit decimal integers.
+   Five-digit decimal integers occur naturally in many data formats:
+
+   o  Network flow telemetry (packet sizes, inter-arrival times)
+   o  Sensor readings (temperature, pressure, flow rate)
+   o  Financial reference numbers (partial)
+   o  Log file numeric fields
+   o  Cross-reference lists in technical documents
+
+   A CCL-twisted stream may be injected into such a container without
+   modification.  The receiver extracts the numeric field column and
+   passes it to the unstack operation.
+
+   SECURITY NOTE: Steganographic injection does not provide
+   confidentiality.  The twist-map is stored in the artifact RSRC block.
+   A receiver who obtains the full artifact (including the RSRC block)
+   can reverse the transform without the prime.  The steganographic
+   container conceals only the existence of the payload,
+   not its content.
+
+   If confidentiality is required, the payload MUST be encrypted before
+   CCL is applied.  CCL and encryption are composable: encrypt first,
+   then encode to FDS, then apply CCL.
+
+
+10.  Layer Separation
+
+   CCL is a strictly separable layer.  The following table defines the
+   responsibility boundary of each layer in the Crowsong stack:
+
+      Layer              Responsibility
+      -----              --------------
+      Shamir             Threshold security
+      Mnemonic wrapping  Human recovery of key material
+      CCL                Visual/statistical camouflage
+      FDS                Transport encoding
+
+   No layer depends on another for its correctness or for preserving its
+   security guarantees.  CCL MAY be applied without Shamir or mnemonic
+   wrapping.  Mnemonic wrapping MAY be used without CCL.  FDS MUST be
+   the outermost encoding layer visible to the transport channel.
+
+   The application of CCL does not affect FDS framing, CRC32
+   verification, or DESTROY semantics as defined in draft-darley-fds-00.
+   These operate on the CCL-twisted token stream as if it were a normal
+   FDS payload.
+
+
+11.  Open Questions
+
+   The following questions are open and MUST be resolved before this
+   document is published as a normative specification.
+
+   11.1.  Verse canonicalisation rules
+
+      Beyond NFC normalisation, the following decisions are deferred:
+      whitespace handling (collapse or preserve), punctuation handling,
+      case folding, and line ending normalisation.
+
+      The canonical recommendation, pending formal specification:
+      NFC + strip leading/trailing whitespace + collapse internal
+      whitespace + preserve punctuation + preserve case.
+
+   11.2.  KDF selection for Mnemonic Share Wrapping
+
+      The verse-to-prime construction in Section 5 is used for CCL key
+      derivation.  The related Mnemonic Share Wrapping construction
+      (draft-darley-shard-bundle-01) requires a KDF.  The selection of
+      that KDF (PBKDF2-HMAC-SHA256 recommended) is the primary gate for
+      the normative mnemonic wrapping specification and is tracked in
+      draft-darley-shard-bundle-01.
+
+   11.3.  CCL transform set extension
+
+      This document specifies base-switching using bases 2 through 9.
+      Future extensions may include digit regrouping and mixed-radix
+      encoding.  These are deferred to a future revision.
+
+   11.4.  Interaction with WIDTH/3 BINARY mode
+
+      The interaction of CCL with the WIDTH/3 BINARY mode defined in
+      draft-darley-fds-01 is not specified here and is deferred.
+
+   11.5.  Feasibility fallback semantics under stacking
+
+      Under repeated stacking, the feasibility fallback (Section 4.3)
+      causes an increasing proportion of tokens to remain in base 10.
+      The interaction of this effect with the entropy ceiling is noted
+      empirically in Section 8 but not formally characterised.  A formal
+      analysis is deferred.
+
+
+12.  Security Considerations
+
+   12.1.  CCL provides no security
+
+      CCL is not a security mechanism.  It MUST NOT be used as a
+      substitute for encryption.  The twist-map stored in the artifact
+   RSRC block allows reversal by any party who possesses
+   the artifact.
+
+   12.2.  Passive pattern recognition
+
+      CCL reduces the effectiveness of passive pattern-recognition
+      systems that identify FDS streams by their statistical signature.
+      It does not prevent active analysis by an adversary who knows CCL
+      is in use and possesses the artifact.
+
+   12.3.  Key material in artifacts
+
+      The PRIME field in the RSRC block carries the full prime used for
+      key scheduling.  If the prime is derived from a verse (Section 5),
+      the verse must be kept secret if the prime is to be kept secret.
+      The prime itself is not the secret under the mnemonic model: the
+      verse is the secret, and the prime is derived from it.
+
+      Artifacts that carry the PRIME field in plaintext are not suitable
+      as the sole security mechanism for sensitive payloads.  Encrypt
+      before applying CCL if confidentiality is required.
+
+   12.4.  Entropy and distinguishability
+
+      CCL3 on the canonical test vector achieves 8.37 bits/token,
+      exceeding the AES-128 ciphertext reference of ~7.9-8.0 bits/byte.
+      This metric characterises statistical indistinguishability from
+      encrypted data to passive entropy-based analysis only.  It does
+      not constitute a security proof.  A determined adversary with
+      knowledge of the CCL construction, access to the RSRC block, and
+      the prime can reverse the transform regardless of the measured
+      entropy.
+
+   12.5.  Primality and key schedule quality
+
+      The key schedule is derived from the decimal digits of a prime.
+      The choice of a prime (rather than an arbitrary integer) does not
+      provide cryptographic security guarantees.  The prime's digits are
+      used purely as a deterministic source of values in the range 0-9.
+      The cryptographic properties of the prime are not relevant to CCL.
+
+   12.6.  Side-channel and steganographic risks
+
+      Steganographic injection (Section 9) conceals the existence of an
+      FDS payload within a plausible container.  It does not provide
+      confidentiality and may create legal risks in jurisdictions where
+      steganography is restricted.  Operators should be aware of
+      applicable law.
+
+
+13.  IANA Considerations
+
+   This document has no IANA actions.
+
+   If the CCL artifact format is standardised, registration of the
+   "prime-twist" TYPE value in an FDS RSRC Type registry may be
+   appropriate.  This is deferred to the normative specification.
+
+
+14.  References
+
+14.1.  Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+   [FDS-00]   Darley, V., "Fox Decimal Script: Human-Transcribable
+              Unicode Encoding", draft-darley-fds-00, 2026.
+
+14.2.  Informative References
+
+   [RFC4838]  Cerf, V., et al., "Delay-Tolerant Networking
+              Architecture", RFC 4838, April 2007.
+
+   [SHARD-00] Darley, V., "FDS Mnemonic Share Wrapping and Shard
+              Bundle", draft-darley-shard-bundle-00, 2026.
+
+   [SHANNON]  Shannon, C.E., "A Mathematical Theory of Communication",
+              Bell System Technical Journal, Vol. 27, 1948.
+
+
+Appendix A.  Reference Implementation
+
+   The reference implementation is available at:
+
+      tools/mnemonic/prime_twist.py
+
+   Subcommands:
+
+      twist   --prime P [--width N] [--ref ID] [--med M]
+                  Apply single CCL pass. Input: stdin
+                  (FDS token stream).
+                  Output: FDS Print Profile artifact.
+
+      untwist <infile>
+                  Reverse single CCL pass. Output: FDS token stream.
+
+      stack   --primes P1,P2,... | --verse-file FILE
+              [--ref ID] [--med M] [--width N]
+                  Apply N passes. Input: stdin. Output: stack file.
+                  Maximum depth: 10.
+
+      unstack <infile>
+                  Unwind all passes. Output: FDS token stream.
+
+   Verse-to-prime derivation:
+
+      tools/mnemonic/verse_to_prime.py derive [--ref ID] [--med M]
+                  Input: verse on stdin.
+                  Output: FDS Print Profile artifact containing
+                          the derived prime encoded in UCS-DEC.
+
+   All tools: Python 2.7+/3.x, no external dependencies.
+
+
+Appendix B.  Canonical Test Vector
+
+   Input verse (K1):
+      "Factoring primes in the hot sun,
+       I fought Entropy -- and Entropy won."
+
+   Derived prime P1 (78 digits):
+      11105665647563463056877823282949060982889143543264791791490393
+      555474760597509
+
+   Input payload:
+      archive/flash-paper-SI-2084-FP-001-payload.txt
+      534 tokens, WIDTH/5, NFC, LF
+
+   CCL1 twist-map (sparse, first 10 entries):
+      3:5,5:4,8:5,10:8,13:8,14:9,15:3,17:5,19:6,20:6,...
+
+   CCL1 entropy: 6.9646 bits/token (172 unique tokens)
+   CCL3 entropy: 8.3714 bits/token (375 unique tokens)
+
+   Round-trip verification:
+      python tools/mnemonic/prime_twist.py stack \
+          --verse-file verses.txt --ref CCL3-TEST \
+          < archive/flash-paper-SI-2084-FP-001-payload.txt \
+          > /tmp/stack.txt
+      python tools/mnemonic/prime_twist.py unstack /tmp/stack.txt \
+          | diff - archive/flash-paper-SI-2084-FP-001-payload.txt
+      # Expected: silence
+
+
+Author's Address
+
+   Vernon Olin Darley III
+   Proper Tools SRL
+   Brussels, Belgium
+   Email: trey@propertools.be
