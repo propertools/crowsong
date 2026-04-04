@@ -1,0 +1,750 @@
+# Fox Decimal Script (FDS)
+### A Human-Legible Unicode Encoding for Degraded-Channel Transmission
+
+`draft-darley-fds-00`
+
+---
+
+**Internet-Draft**
+Trey Darley
+Proper Tools SRL
+Expires: 2026-10-01
+1 April 2026
+
+---
+
+## Dedication
+
+This document is dedicated to the memory of Felix "FX" Lindner (1975–2026), who understood that the most important infrastructure is the kind you build before you need it, and who demonstrated this understanding in what he built.
+
+What we shared was not secrets. It was a love of math, memes, computers, moms, bread, puns, music, and mathematicians.
+
+We miss him very much today. This was meant as a gift to him.
+
+---
+
+## Provenance Note
+
+Fox Decimal Script is the author's original work, developed as the L2 encoding layer of the Crowsong Suite in 2026. The canonical test vector is a poem. This seemed appropriate.
+
+---
+
+## Abstract
+
+This document specifies Fox Decimal Script (FDS), a text-based encoding format for transmitting Unicode data across degraded, lossy, or human-mediated channels.
+
+FDS represents each Unicode code point as a zero-padded decimal integer in a fixed-width field, arranged in configurable columns, with optional framing providing error detection and authentication.
+
+The encoding is stateless, deterministic, and trivially reversible. Any person with a Unicode code point table can decode an FDS message without software. This property is a design requirement, not a fallback.
+
+FDS is the L2 encoding layer of the Crowsong Suite [CROWSONG]. It may also be used independently for point-to-point messaging over any channel capable of carrying decimal digits.
+
+The formal designation is UCS-DEC (Unicode Character Set, Decimal encoding). The operational name is Fox Decimal Script.
+
+---
+
+## Status of This Memo
+
+This Internet-Draft is submitted in full conformance with the provisions of BCP 78 and BCP 79.
+
+Internet-Drafts are working documents of the Internet Engineering Task Force (IETF). Note that other groups may also distribute working documents as Internet-Drafts. The list of current Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+Internet-Drafts are draft documents valid for a maximum of six months and may be updated, replaced, or obsoleted by other documents at any time. It is inappropriate to use Internet-Drafts as reference documents or to cite them other than as "work in progress."
+
+This Internet-Draft will expire on 1 October 2026.
+
+---
+
+## Copyright Notice
+
+Copyright (c) 2026 IETF Trust and the persons identified as the document authors. All rights reserved.
+
+This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (https://trustee.ietf.org/license-info) in effect on the date of publication of this document.
+
+---
+
+## Table of Contents
+
+1. Introduction
+   - 1.1. Motivation
+   - 1.2. Design Goals
+   - 1.3. Terminology
+   - 1.4. Relationship to the Crowsong Suite
+2. Encoding Specification (UCS-DEC)
+   - 2.1. Input Normalisation
+   - 2.2. Transformation
+   - 2.3. Field Width
+   - 2.4. Tokenisation
+   - 2.5. Column Formatting
+   - 2.6. Padding
+3. FDS-FRAME: Framing and Error Detection
+   - 3.1. Frame Structure
+   - 3.2. Header
+   - 3.3. Payload
+   - 3.4. Trailer
+4. FDS Print Profile
+5. Authentication Extension
+6. Binary Payload Encoding
+7. Transport Compatibility Matrix
+8. Decoding Rules
+   - 8.1. Input Processing
+   - 8.2. Error Handling
+9. Reference Implementation
+10. Security Considerations
+    - 10.1. Error Detection vs. Authentication
+    - 10.2. Confidentiality
+    - 10.3. Malformed Token Handling
+11. IANA Considerations
+12. References
+    - 12.1. Normative References
+    - 12.2. Informative References
+13. Acknowledgements
+14. Author's Address
+
+Appendix A. Test Vector: Flash Paper SI-2084-FP-001
+
+---
+
+## 1. Introduction
+
+### 1.1. Motivation
+
+Communications infrastructure fails. When it does, the channels that remain — fax machines, Morse keys, printed pages, human couriers, shortwave radio carrying voice — share one property: they cannot carry arbitrary binary data.
+
+Existing binary-to-text encodings (Base64 [RFC4648], hexadecimal, UUencoding) produce output that is machine-readable but not human-legible: a person confronted with a Base64 string cannot determine whether a single character has been corrupted without running a decoder.
+
+FDS produces output that a person can read, transcribe, verify, and partially recover from corruption without any software. Each encoded value is a decimal integer. Errors are local: a corrupted value affects only that code point, not the remainder of the message. The value count in the trailer provides a simple integrity check performable by hand.
+
+This is the design space FDS occupies: not the most efficient encoding, but the most survivable one.
+
+### 1.2. Design Goals
+
+**Human-readable.** Encoded values can be visually parsed and verified by any literate person.
+
+**Machine-simple.** Encoding and decoding are stateless and require no context beyond the field width.
+
+**Transport-agnostic.** The encoding operates over text, image, audio, or physical media without modification.
+
+**Error-tolerant.** Corruption of one token does not cascade to adjacent tokens.
+
+**Deterministic.** No ambiguity in encoding or decoding.
+
+**Long-horizon survivable.** A message encoded in FDS and printed on archival paper remains decodable by any person with a Unicode table, indefinitely.
+
+### 1.3. Terminology
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [RFC2119] [RFC8174].
+
+**UCS-DEC:** The formal designation of the encoding defined in this document. Unicode Character Set, Decimal encoding.
+
+**FDS:** Fox Decimal Script. The operational name for UCS-DEC.
+
+**FDS-FRAME:** A structured message envelope encapsulating an FDS-encoded payload with header, error-detection trailer, and optional authentication.
+
+**FDS Print Profile:** A layered artifact format built on FDS-FRAME, optimised for printing on physical media. Defined in Section 4.
+
+**Field width:** The number of decimal digits used to represent each code point. Default: 5.
+
+**Column width:** The number of encoded values per row when column formatting is applied. Default: 6.
+
+**Token:** A single zero-padded decimal value representing one Unicode code point.
+
+**Null token:** A token whose decimal value is zero for its field width (e.g., `00000` at WIDTH/5), used for row padding. MUST be ignored during decoding unless explicitly preserved. MUST NOT be used as semantic content in canonical FDS profiles.
+
+### 1.4. Relationship to the Crowsong Suite
+
+FDS is specified as the L2 encoding layer of the Crowsong Suite [CROWSONG]. In that context, FDS provides the convergence layer enabling DTN bundles [RFC4838] [RFC9171] to be carried over non-binary channels.
+
+FDS MAY be used independently of the Crowsong Suite for any application requiring human-legible Unicode encoding. The FDS-FRAME structure (Section 3) is OPTIONAL for standalone use but REQUIRED when FDS is used as a Crowsong Suite convergence layer.
+
+---
+
+## 2. Encoding Specification (UCS-DEC)
+
+### 2.1. Input Normalisation
+
+Input text MUST be normalised to NFC [UAX15] before encoding. Implementations MUST document whether they perform normalisation automatically. Implementations that do not normalise input MUST document this limitation and the interoperability consequences.
+
+**Rationale:** NFC normalisation ensures that semantically equivalent Unicode strings produce identical encoded output. Failure to normalise may produce different token sequences for equivalent input, causing verification failures. Canonical reproducibility of test vectors depends on stable normalisation.
+
+### 2.2. Transformation
+
+Each character is converted as follows:
+
+```
+codepoint = ord(character)
+encoded   = zero_pad(decimal(codepoint), width)
+```
+
+Where `zero_pad(n, w)` produces the decimal representation of `n` padded with leading zeros to width `w`.
+
+Example (field width 5):
+
+| Character | Code Point | Encoded |
+|-----------|-----------|---------|
+| A         | 65        | 00065   |
+| a         | 97        | 00097   |
+| (space)   | 32        | 00032   |
+| —         | 8212      | 08212   |
+| 桜        | 26716     | 26716   |
+| 稲        | 31282     | 31282   |
+| 荷        | 33655     | 33655   |
+
+### 2.3. Field Width
+
+The default field width is 5 digits, supporting code points in the range U+00000 to U+1869F (decimal 0 to 99999). This range encompasses the Basic Multilingual Plane (U+0000 to U+FFFF) and the majority of supplementary planes in common operational use.
+
+For content requiring code points above U+1869F (decimal 99999), a 7-digit extended field width MUST be used, supporting the full Unicode range (U+00000 to U+10FFFF, decimal 0 to 1114111).
+
+The field width MUST be declared in the FDS-FRAME header (Section 3.2). Mixing field widths within a single frame is NOT RECOMMENDED. If mixed-width encoding is required, it MUST be explicitly signalled in the frame header and documented in the implementation.
+
+### 2.4. Tokenisation
+
+Encoded values are separated by whitespace. Canonical emitters SHOULD use a single ASCII space character (U+0020) between tokens on a logical line. When column formatting is applied (Section 2.5), canonical emitters SHOULD use two ASCII space characters between tokens within a row for visual alignment.
+
+Receivers MUST treat any whitespace (space, tab, newline, carriage return) as a token separator. Receivers MUST ignore empty tokens produced by consecutive whitespace characters.
+
+### 2.5. Column Formatting
+
+Encoded values MAY be arranged in fixed columns for human legibility. The default column width is 6 values per row (COL/6).
+
+**Rationale for COL/6 default:** Six values per row produces consistent visual line length, aligns with common line-width constraints on text-capable channels (fax, teletype), and produces a visual rhythm that assists human verification and transcription.
+
+Column width is declared in the FDS-FRAME header and MAY be set to any positive integer. A column width of 0 disables column formatting (all values on a single logical line).
+
+Column formatting is a presentation convention. Decoders MUST produce identical output regardless of whether input is formatted in columns or as a single token stream.
+
+### 2.6. Padding
+
+Trailing null tokens (field-width zeros, e.g., `00000` for WIDTH/5) MAY be appended to complete the final row to full column width for visual alignment.
+
+**Null token semantics:** Represents no-op. Decoders MUST skip null tokens by default. Decoders MAY provide an option to preserve null tokens in output; this option MUST be explicitly invoked and MUST NOT be the default.
+
+In canonical FDS profiles, null token (all-zeros for the current field width) is RESERVED for row padding and MUST NOT be used to encode semantic content (U+0000). Applications requiring transmission of U+0000 MUST handle this out of band or signal it explicitly in the frame header.
+
+The padding token value MUST be declared in the FDS-FRAME header (PAD field).
+
+---
+
+## 3. FDS-FRAME: Framing and Error Detection
+
+FDS-FRAME is a structured message envelope providing encoding parameters, error detection, and optional authentication for FDS-encoded payloads.
+
+FDS-FRAME is OPTIONAL for standalone point-to-point use. FDS-FRAME is REQUIRED when FDS is used as a Crowsong Suite convergence layer (per [CROWSONG]) or when carrying trust primitives at L4.
+
+CRC-32 provides detection of accidental transmission errors. Cryptographic authenticity MUST be provided separately via signatures (Section 5).
+
+### 3.1. Frame Structure
+
+An FDS-FRAME consists of three components in order:
+
+1. Header (one or two lines)
+2. Payload (FDS-encoded content)
+3. Trailer (one or two lines)
+
+### 3.2. Header
+
+The header is a single line of the form:
+
+```
+ENC: UCS · DEC · COL/<n> · PAD/<pad> · WIDTH/<w>
+```
+
+Fields are separated by the Unicode middle dot (U+00B7) surrounded by single spaces.
+
+**Required fields:**
+
+`UCS` — Identifies the encoding as Unicode Character Set encoding. MUST be present. MUST be the literal string "UCS".
+
+`DEC` — Identifies the encoding variant as decimal. MUST be present. MUST be the literal string "DEC".
+
+**Optional fields (RECOMMENDED):**
+
+`COL/<n>` — Column width. `n` is a positive integer or 0. Default: COL/6 if absent.
+
+`PAD/<pad>` — Padding token value. Default: PAD/00000 if absent.
+
+`WIDTH/<w>` — Field width in digits. Default: WIDTH/5 if absent.
+
+Additional fields MAY be appended. Unknown fields MUST be ignored by decoders.
+
+**Currently defined additional fields:**
+
+`B64` — Indicates that the decoded text is a base64url-encoded binary payload (see Section 6). No value; presence is the signal.
+
+`SIG: ED25519 · <sig>` — Indicates that an Ed25519 signature is present (see Section 5). Appears on a second header line immediately following the ENC line.
+
+Example header (standard):
+
+```
+ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5
+```
+
+Example header (with authentication):
+
+```
+ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5
+SIG: ED25519 · <base64url-encoded Ed25519 signature>
+```
+
+### 3.3. Payload
+
+The payload is the FDS-encoded content, formatted per the parameters declared in the header.
+
+### 3.4. Trailer
+
+The trailer consists of one required line and one conditional line.
+
+**Required:**
+
+```
+<n> VALUES · CRC32:<hex> · VERIFY COUNT BEFORE USE
+```
+
+Where:
+
+`<n>` — The total count of encoded values in the payload, excluding null padding tokens. Receivers MUST verify this count before processing decoded content.
+
+`<hex>` — The CRC-32 [ISO3309] of the encoded payload string exactly as transmitted, excluding header and trailer lines. This protects the exact transmitted representation, including token formatting, spacing, and column structure. Receivers MUST verify this value before using decoded content.
+
+**Conditional** (REQUIRED when the frame carries key material or other content that must not be used if corrupted):
+
+```
+IF COUNT FAILS: DESTROY IMMEDIATELY
+```
+
+This line is a protocol instruction. Receivers MUST NOT use decoded content from frames bearing this line if either the value count or CRC-32 verification fails.
+
+Example complete FDS-FRAME:
+
+```
+ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5
+00072  00101  00108  00108  00111  00010
+00000  00000  00000  00000  00000  00000
+6 VALUES · CRC32:3610A686 · VERIFY COUNT BEFORE USE
+```
+
+---
+
+## 4. FDS Print Profile
+
+The FDS Print Profile is a layered artifact format built on FDS-FRAME and optimised for printing, archiving, and physical distribution. It is not a replacement for FDS-FRAME, but a defined physical-media profile of it.
+
+A Print Profile artifact wraps an FDS-FRAME payload in a human-readable box border with provenance metadata, integrity fields, and handling instructions. It is intended for use on physical media where the artifact must be self-describing to a recipient with no prior knowledge of FDS.
+
+### 4.1. Structure
+
+A Print Profile artifact consists of:
+
+1. Preamble banner
+2. Header box
+3. Payload (FDS-encoded content, identical to FDS-FRAME payload)
+4. Footer box
+5. Postamble banner
+
+### 4.2. Preamble and Postamble
+
+```
+RESERVED -- SINGLE USE
+```
+
+and
+
+```
+                   RESERVED -- SINGLE USE
+```
+
+These are handling instructions, not protocol fields. The indented postamble is intentional, providing visual distinction when the artifact is folded or sleeved.
+
+`RESERVED -- SINGLE USE` uses ASCII double-hyphen. This is intentional: machine-generated artifacts MUST use ASCII `--` for reproducibility. Em dashes are NOT RECOMMENDED in machine-generated banners.
+
+### 4.3. Header Box
+
+The header box contains:
+
+```
++-----------------------------------------+
+|  REF: <ref>  PAGE <n>/<t>               |
+|  ENC: UCS · DEC · COL/<n> · PAD/<pad> · WIDTH/<w>  |
+|  MED: <medium>                          |
+|  DESTROY AFTER READING                  |
++-----------------------------------------+
+```
+
+Header box fields MAY be distributed across multiple boxed lines. Only the `ENC` field is required for protocol interpretation.
+
+Fields:
+
+`REF` — Artifact reference identifier. OPTIONAL.
+
+`PAGE` — Page designation, e.g., `1/1`. OPTIONAL; included when REF is present.
+
+`ENC` — Encoding parameters. REQUIRED. Format identical to FDS-FRAME header (Section 3.2), including WIDTH on the same line.
+
+`MED` — Physical medium designation, e.g., `FLASH`, `PAPER`, `ARCHIVAL`. OPTIONAL.
+
+`DESTROY AFTER READING` — Handling instruction. OPTIONAL; RECOMMENDED for single-use key material or flash paper artifacts.
+
+### 4.4. Footer Box
+
+The footer box contains:
+
+```
++-----------------------------------------+
+|  <n> VALUES · CRC32:<hex>               |
+|  VERIFY COUNT BEFORE USE                |
+|  IF COUNT FAILS: DESTROY IMMEDIATELY    |
+|  <attribution>                          |
++-----------------------------------------+
+```
+
+Fields:
+
+`<n> VALUES · CRC32:<hex>` — Value count and CRC32. Semantics identical to FDS-FRAME trailer (Section 3.4).
+
+`VERIFY COUNT BEFORE USE` — REQUIRED.
+
+`IF COUNT FAILS: DESTROY IMMEDIATELY` — REQUIRED for single-use key material; RECOMMENDED otherwise.
+
+`<attribution>` — Attribution string, e.g., `桜稲荷`. OPTIONAL.
+
+### 4.5. Canonical Generation
+
+The reference implementation (`ucs_dec_tool.py`) generates Print Profile artifacts via the `--frame` flag:
+
+```bash
+python ucs_dec_tool.py -e \
+  --frame --ref SI-2084-FP-001 --med FLASH --attribution '桜稲荷' \
+  < archive/second-law-blues.txt \
+  > archive/flash-paper-SI-2084-FP-001-framed.txt
+```
+
+Implementations MUST ensure that the ENC line in the Print Profile header is byte-for-byte identical to what would appear in a bare FDS-FRAME header for the same encoding parameters.
+
+---
+
+## 5. Authentication Extension
+
+FDS-FRAME MAY carry an Ed25519 [RFC8032] signature over the decoded payload.
+
+When present, the signature appears as a second header line immediately following the ENC line:
+
+```
+SIG: ED25519 · <base64url-encoded Ed25519 signature>
+```
+
+The signature is computed over the UTF-8 encoding of the decoded payload (after null token removal and NFC normalisation), not over the FDS-encoded representation. This ensures that the signature remains valid regardless of column formatting or padding choices.
+
+Receivers MUST verify the signature against the sender's known public key before using decoded content. Receivers MUST NOT use decoded content if signature verification fails.
+
+Public key distribution is out of scope for this document. Implementations operating within the Crowsong Suite SHOULD use SHARD-BUNDLE [SHARD] for public key distribution over degraded channels.
+
+---
+
+## 6. Binary Payload Encoding
+
+Binary payloads (DTN bundles, encrypted data, compressed archives) MUST be base64url-encoded [RFC4648] before FDS encoding. The resulting base64url string is then encoded as FDS in the normal manner.
+
+The B64 flag MUST be declared in the frame header:
+
+```
+ENC: UCS · DEC · COL/6 · PAD/00000 · WIDTH/5 · B64
+```
+
+Decoders MUST base64url-decode the decoded text string after FDS decoding when the B64 flag is present.
+
+**Rationale:** Binary content cannot be safely transmitted over Class B, C, or D channels (per [CROWSONG] channel classification). base64url encoding converts binary to a text-safe form; FDS encoding then converts that text to a decimal form suitable for all channel classes including Class D (human relay).
+
+---
+
+## 7. Transport Compatibility Matrix
+
+| Channel Class | FDS Required | Binary Payload | Notes |
+|---|---|---|---|
+| A (binary) | OPTIONAL | Direct | FDS adds legibility at cost of bandwidth; useful in mixed environments |
+| B (text) | REQUIRED | Via B64 | Standard deployment for text-capable non-binary channels |
+| C (symbol) | REQUIRED | Via B64 | Symbol mapping from decimal digits to channel symbols is channel-specific (out of scope) |
+| D (human) | REQUIRED | NOT RECOMMENDED | Binary payloads SHOULD be avoided in human-relay contexts when possible; if unavoidable, base64url plus FDS is the required path |
+
+---
+
+## 8. Decoding Rules
+
+### 8.1. Input Processing
+
+Fully compliant frame-aware decoders MUST:
+
+1. If a frame header is present, parse and validate it. Extract field width, column width, and padding value. Apply defaults for any absent optional fields.
+
+2. Tokenise the payload by splitting on whitespace.
+
+3. For each token:
+   - Parse as a non-negative integer.
+   - If the value equals the null token value for the current field width, skip (unless null-preservation mode is active).
+   - Verify the value is within the valid Unicode range (0 to 1114111 / U+10FFFF). If not, skip.
+   - Convert the integer to a Unicode code point using `chr(value)`.
+   - Append the resulting character to the output stream.
+
+4. If a trailer is present:
+   - Verify the value count.
+   - Verify the CRC-32 over the encoded payload string exactly as received.
+   - If either verification fails and the frame bears `IF COUNT FAILS: DESTROY IMMEDIATELY`, discard the decoded content.
+
+5. If a SIG line is present, verify the Ed25519 signature over the decoded output.
+
+### 8.2. Error Handling
+
+Decoders MUST:
+
+- Ignore malformed tokens (tokens that are not parseable as non-negative integers). Processing MUST continue with the next token.
+- Ignore tokens whose integer value exceeds the maximum valid Unicode code point (1114111 / U+10FFFF).
+- Not propagate errors from one token to adjacent tokens.
+
+Decoders MUST NOT:
+
+- Hard-fail on partial corruption of a non-authenticated frame. The encoding is designed to degrade gracefully.
+- Use decoded content from a frame that fails value count or CRC-32 verification when the frame bears `IF COUNT FAILS: DESTROY IMMEDIATELY`.
+
+**Rationale:** Graceful error handling reflects the operational environment. Human-transcribed messages will contain errors. The encoding is designed to survive them.
+
+---
+
+## 9. Reference Implementation
+
+A partial reference implementation of FDS encoding, payload decoding, token-shape validation, and Print Profile generation is provided as `ucs_dec_tool.py` [UCSDEC]. The implementation is MIT-licensed and compatible with Python 2.7 and Python 3.x, with no dependencies beyond the standard library.
+
+The current implementation provides:
+
+- FDS encoding (`-e` / `--encode`)
+- FDS decoding (`-d` / `--decode`), frame-aware: extracts WIDTH/COL/PAD from FDS-FRAME header when present
+- Token shape and frame verification (`-v` / `--verify`): checks value count, CRC-32, and DESTROY semantics per Section 3.4
+- FDS Print Profile generation (`--frame`)
+
+The implementation is fully frame-aware per Section 8.1. The test suite (`tests/roundtrip/run_tests.sh`) verifies the complete encode/frame/decode/verify cycle: 8 tests, 0 failures.
+
+The tool's decoding behaviour is intentionally permissive for non-frame content: non-numeric tokens are silently ignored, allowing payload recovery from Print Profile artifacts without requiring manual frame stripping.
+
+Usage:
+
+```bash
+# Encode
+echo "Signal survives." | python ucs_dec_tool.py --encode
+
+# Decode
+cat encoded.txt | python ucs_dec_tool.py --decode
+
+# Verify token shape (exits non-zero if invalid tokens present)
+cat encoded.txt | python ucs_dec_tool.py --verify
+
+# Full roundtrip
+echo "Signal." | python ucs_dec_tool.py -e | python ucs_dec_tool.py -d
+
+# Generate Print Profile artifact
+python ucs_dec_tool.py -e \
+  --frame --ref SI-2084-FP-001 --med FLASH --attribution '桜稲荷' \
+  < archive/second-law-blues.txt \
+  > archive/flash-paper-SI-2084-FP-001-framed.txt
+
+# Generate payload only
+python ucs_dec_tool.py -e \
+  < archive/second-law-blues.txt \
+  > archive/flash-paper-SI-2084-FP-001-payload.txt
+```
+
+The canonical test vector is specified in Appendix A. Conformant implementations MUST produce output byte-for-byte identical to the canonical payload artifact when encoding the test vector input text under the same parameters.
+
+---
+
+## 10. Security Considerations
+
+The stack separates error detection, authenticity, and confidentiality; each MUST be considered independently. FDS encoding provides error detection only. Ed25519 signatures (Section 5) provide authenticity. Confidentiality requires an additional encryption layer and is outside the scope of this document.
+
+### 10.1. Error Detection vs. Authentication
+
+CRC-32 detects accidental corruption. It does not provide protection against deliberate modification. An attacker with access to the channel can modify an FDS-FRAME and recompute a valid CRC-32.
+
+For messages requiring integrity protection against active adversaries, Ed25519 authentication (Section 5) MUST be used. CRC-32 and Ed25519 serve complementary roles and SHOULD both be present in authenticated frames.
+
+### 10.2. Confidentiality
+
+FDS encoding does not provide confidentiality. Decoded content is trivially recoverable by any party that receives the encoded message. This is intentional: human legibility and confidentiality are in tension.
+
+Applications requiring confidentiality MUST encrypt content before FDS encoding. GPG [RFC4880] or equivalent SHOULD be used. The encrypted ciphertext is then base64url-encoded and FDS-encoded per Section 6.
+
+### 10.3. Malformed Token Handling
+
+The graceful error handling specified in Section 8.2 means that decoders will silently skip malformed tokens. This behaviour is correct for the intended operational environment (degraded channels with transcription errors) but may mask deliberate injection of garbage tokens in adversarial contexts.
+
+Applications operating in adversarial environments SHOULD use authenticated frames (Section 5) and SHOULD verify that the decoded value count exactly matches the declared count, treating any discrepancy as a potential integrity violation rather than a transcription error.
+
+---
+
+## 11. IANA Considerations
+
+This document requests registration of the following media types:
+
+**Type name:** application
+**Subtype name:** fds-frame
+**Required parameters:** none
+**Optional parameters:** none
+**Encoding considerations:** 8bit
+**Specification:** This document
+
+---
+
+## 12. References
+
+### 12.1. Normative References
+
+**[RFC2119]** Bradner, S., "Key words for use in RFCs to Indicate Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+**[RFC8174]** Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+**[RFC8032]** Josefsson, S. and I. Liusvaara, "Edwards-Curve Digital Signature Algorithm (EdDSA)", RFC 8032, January 2017.
+
+**[RFC4648]** Josefsson, S., "The Base16, Base32, and Base64 Data Encodings", RFC 4648, October 2006.
+
+**[ISO3309]** ISO/IEC 3309:1993, "Information technology — Telecommunications and information exchange between systems — High-level data link control (HDLC) procedures — Frame structure."
+
+**[UAX15]** Davis, M. and K. Whistler, "Unicode Normalization Forms", Unicode Standard Annex #15. https://www.unicode.org/reports/tr15/
+
+### 12.2. Informative References
+
+**[RFC4838]** Cerf, V. et al., "Delay-Tolerant Networking Architecture", RFC 4838, April 2007.
+
+**[RFC9171]** Burleigh, S., Fall, K., and E. Birrane, "Bundle Protocol Version 7", RFC 9171, January 2022.
+
+**[RFC4880]** Callas, J. et al., "OpenPGP Message Format", RFC 4880, November 2007.
+
+**[CROWSONG]** Darley, T., "The Crowsong Suite", draft-darley-crowsong-00, work in progress.
+
+**[SHARD]** Darley, T., "SHARD-BUNDLE and MIRROR-ATTESTATION", draft-darley-shard-bundle-00, work in progress.
+
+**[UCSDEC]** Darley, T., "ucs_dec_tool.py — Fox Decimal Script encoder/decoder", MIT License, 2026. https://github.com/propertools/crowsong
+
+**[SLB]** Darley, T., "Second Law Blues", encoded as artifact SI-2084-FP-001, 2026.
+
+---
+
+## 13. Acknowledgements
+
+The attribution encoded in the canonical test vector — Sakura Inari (written in Japanese: the fox deity, guardian of thresholds and messenger between worlds) — is encoded as the first three values of the canonical artifact: 26716, 31282, 33655. The encoding eats its own attribution.
+
+This seemed appropriate for a format designed to carry signals across gaps.
+
+---
+
+## 14. Author's Address
+
+Trey Darley
+Proper Tools SRL
+Brussels, Belgium
+
+Email: trey@propertools.be
+URI: https://propertools.be
+
+---
+
+## Appendix A. Test Vector: Flash Paper SI-2084-FP-001
+
+This appendix provides the canonical test vector for FDS implementations. Conformant implementations MUST produce output byte-for-byte identical to the payload in `archive/flash-paper-SI-2084-FP-001-payload.txt` when encoding the input text in `archive/second-law-blues.txt` under the parameters specified below.
+
+### A.1. Input Text
+
+The input is the poem "Second Law Blues" by T. Darley, preceded by the attribution. The complete input text is in `archive/second-law-blues.txt`, NFC-normalised, UTF-8 encoded, LF line endings, with a single trailing newline.
+
+The poem begins:
+
+```
+桜稲荷
+Second Law Blues
+
+(Or, Espresso-Fueled Eigenstates)
+
+Factoring primes
+in the hot sun,
+I fought Entropy —
+and Entropy won.
+```
+
+And ends:
+
+```
+The signal strains,
+but never gone —
+I fought Entropy,
+and I forged on.
+```
+
+### A.2. Encoding Parameters
+
+| Parameter | Value |
+|---|---|
+| Field width | 5 digits (WIDTH/5) |
+| Column width | 6 values per row (COL/6) |
+| Padding | 00000 (PAD/00000) |
+| NFC normalisation | Required |
+| Line endings | LF only |
+| Trailing newline | Present |
+| Binary | No |
+
+### A.3. Canonical Encoded Artifact
+
+The complete payload is in:
+
+```
+archive/flash-paper-SI-2084-FP-001-payload.txt
+```
+
+First row of payload (for spot-check):
+
+```
+26716  31282  33655  00010  00083  00101
+```
+
+The first three values MUST decode to 桜稲荷 (Sakura Inari). This is the encoding's attribution, encoded in its own format.
+
+Value count (excluding padding): **531**
+CRC32 (over encoded payload string): **E8DC9BF3**
+
+### A.4. Roundtrip Verification
+
+**Step 1 — Verify token shape:**
+
+```bash
+cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
+  python ucs_dec_tool.py --verify
+# Expected: Valid tokens: 534, Invalid: 0
+# Of these, 531 are semantic values and 3 are row-padding null tokens.
+```
+
+**Step 2 — Decode and inspect:**
+
+```bash
+cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
+  python ucs_dec_tool.py --decode
+# Expected: the poem, in full.
+```
+
+**Step 3 — Re-encode and diff:**
+
+```bash
+python ucs_dec_tool.py -e \
+  < archive/second-law-blues.txt | \
+  diff - archive/flash-paper-SI-2084-FP-001-payload.txt
+# Expected: no output (identical).
+```
+
+**Or simply:**
+
+```bash
+bash tests/roundtrip/run_tests.sh
+```
+
+### A.5. Provenance Note
+
+Artifact SI-2084-FP-001 was first instantiated on flash paper in 2026.
+
+The encoding is not intended to be unbreakable. It is intended to look like it might be — to reward the reader who tries, and to be opaque to the reader who does not.
+
+The 531-value count is not accidental.
