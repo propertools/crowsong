@@ -8,7 +8,9 @@ A protocol suite for signals that must survive.
 
 ## What this is
 
-Crowsong is a family of Internet-Drafts defining a layered communications architecture that remains **interpretable, verifiable, and transmissible** even when reduced to manual transcription over non-binary channels.
+Crowsong is a family of Internet-Drafts defining a layered communications
+architecture that remains **interpretable, verifiable, and transmissible**
+even when reduced to manual transcription over non-binary channels.
 
 This is not a fallback property. It is a design constraint.
 
@@ -16,9 +18,10 @@ This is not a fallback property. It is a design constraint.
 
 ## The problem
 
-When infrastructure fails, the channels that remain — fax, Morse, printed page, human relay — cannot reliably carry binary data.
+When infrastructure fails, the channels that remain — fax, Morse, printed
+page, human relay — cannot reliably carry binary data.
 
-Most “resilient” protocols assume a degraded IP network.
+Most "resilient" protocols assume a degraded IP network.
 
 Crowsong assumes the network may not exist at all.
 
@@ -48,12 +51,12 @@ draft-darley-fds-00           draft-darley-shard-bundle-00
 tools/ucs-dec/ucs_dec_tool.py
 ```
 
-| Draft                               | Description                                    |
-| ----------------------------------- | ---------------------------------------------- |
-| `draft-darley-fds-00`               | Encoding — human-transcribable Unicode decimal |
-| `draft-darley-shard-bundle-00`      | Trust — threshold key distribution             |
-| `draft-darley-crowsong-00`          | Architecture — how the system composes         |
-| `draft-darley-meridian-protocol-01` | Content — continuity of web artifacts          |
+| Draft | Description |
+|-------|-------------|
+| `draft-darley-fds-00` | Encoding — human-transcribable Unicode decimal |
+| `draft-darley-shard-bundle-00` | Trust — threshold key distribution |
+| `draft-darley-crowsong-00` | Architecture — how the system composes |
+| `draft-darley-meridian-protocol-01` | Content — continuity of web artifacts |
 
 ---
 
@@ -63,10 +66,10 @@ tools/ucs-dec/ucs_dec_tool.py
 drafts/                       Internet-Drafts
 drafts/meridian-protocol/     Meridian Protocol (submodule)
 tools/ucs-dec/                reference implementation (FDS)
+tools/baseconv/               base conversion utility
 docs/                         supporting material and guides
 archive/                      canonical test vectors
 tests/roundtrip/              verification scripts
-bible/                        structural principles (design doctrine)
 ```
 
 ---
@@ -76,42 +79,45 @@ bible/                        structural principles (design doctrine)
 ```bash
 # Encode
 echo "Signal survives." | python tools/ucs-dec/ucs_dec_tool.py --encode
-00083  00105  00103  00110  00097  00108
-00032  00115  00117  00114  00118  00105
-00118  00101  00115  00046  00010  00000
 
 # Decode
-echo "00083  00105  00103  00110  00097  00108 00032  00115  00117  00114  00118  00105 00118  00101  00115  00046  00010  00000" | python tools/ucs-dec/ucs_dec_tool.py --decode
-Signal survives.
+echo "00083  00105  00103  00110  00097  00108 \
+      00032  00115  00117  00114  00118  00105 \
+      00118  00101  00115  00046  00010  00000" | \
+  python tools/ucs-dec/ucs_dec_tool.py --decode
+# Signal survives.
 
 # Decode the canonical test vector
 cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
   python tools/ucs-dec/ucs_dec_tool.py --decode
 
-# Regenerate canonical test vector payload
+# Regenerate canonical payload
 python tools/ucs-dec/ucs_dec_tool.py -e \
   < archive/second-law-blues.txt \
   > archive/flash-paper-SI-2084-FP-001-payload.txt
 
-# Regenerate framed canonical test vector artifact
+# Regenerate framed artifact
 python tools/ucs-dec/ucs_dec_tool.py -e \
   --frame --ref SI-2084-FP-001 --med FLASH --attribution '桜稲荷' \
   < archive/second-law-blues.txt \
   > archive/flash-paper-SI-2084-FP-001-framed.txt
 
-# Roundtrip check canonical test vector
+# Roundtrip check
 python tools/ucs-dec/ucs_dec_tool.py -e \
   < archive/second-law-blues.txt | \
   diff - archive/flash-paper-SI-2084-FP-001-payload.txt
 # Expected: silence
 
-# Verify the framed canonical test vector artifact
+# Verify framed artifact (count + CRC32 + DESTROY semantics)
 python tools/ucs-dec/ucs_dec_tool.py -v \
   < archive/flash-paper-SI-2084-FP-001-framed.txt
 # Expected: 531 OK, E8DC9BF3 OK
 
-# Verify full test suite
+# Full test suite
 bash tests/roundtrip/run_tests.sh
+```
+
+```
 === Crowsong FDS Roundtrip Test Suite ===
     Artifact: SI-2084-FP-001
 
@@ -136,14 +142,14 @@ bash tests/roundtrip/run_tests.sh
 
 531 VALUES · CRC32:E8DC9BF3 · VERIFIED
 Signal survives.
-
 ```
 
 ---
 
 ## The design in one sentence
 
-Every layer of the system must be operable by a human with patience and appropriate reference material.
+Every layer of the system must be operable by a human with patience and
+appropriate reference material.
 
 ---
 
@@ -159,7 +165,7 @@ archive/second-law-blues.txt
 
 ```bash
 cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
-  python3 tools/ucs-dec/ucs_dec_tool.py --decode
+  python tools/ucs-dec/ucs_dec_tool.py --decode
 ```
 
 Expected result: legible text.
@@ -168,29 +174,43 @@ Expected result: legible text.
 
 ## Where to go next
 
-* **Start here (implementation):**
-  `drafts/draft-darley-fds-00.txt`
+**Start here (implementation):**
+`drafts/draft-darley-fds-00.txt`
 
-* **Architecture:**
-  `drafts/draft-darley-crowsong-00.txt`
+**Architecture:**
+`drafts/draft-darley-crowsong-00.txt`
 
-* **Trust layer:**
-  `drafts/draft-darley-shard-bundle-00.txt`
+**Trust layer:**
+`drafts/draft-darley-shard-bundle-00.txt`
 
-* **Content continuity:**
-  `drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt`
+**Content continuity:**
+`drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt`
 
-* **Design doctrine:**
-  `bible/structural-principles.md`
+**Design doctrine:**
+`docs/structural-principles.md`
 
-* **Full suite overview:**
-  `docs/crowsong-suite-overview.md`
+**Full suite overview:**
+`docs/crowsong-suite-overview.md`
+
+**Long-horizon physical archival:**
+`docs/vesper-archive-protocol.md`
+
+**Local knowledge infrastructure:**
+`docs/vesper-mirror-architecture.md`
+
+**Mnemonic key wrapping and CCL:**
+`docs/mnemonic-shamir-sketch.md`
+
+**Roadmap:**
+`docs/crowsong-roadmap.md`
 
 ---
 
 ## On the name
 
-In the Aeolian Layer — a kite-borne delay-tolerant mesh network, described in the in-progress `draft-darley-aeolian-dtn-arch-01` — the passive listeners are called Crows.
+In the Aeolian Layer — a kite-borne delay-tolerant mesh network, described
+in the in-progress `draft-darley-aeolian-dtn-arch-01` — the passive
+listeners are called Crows.
 
 A crowsong is what they hear.
 
@@ -202,13 +222,11 @@ Early drafts. Subject to revision.
 
 Feedback welcome via:
 
-* GitHub Issues
-* Email: [trey@propertools.be](mailto:trey@propertools.be)
-* IETF DTNWG / DISPATCH
+- GitHub Issues
+- Email: trey@propertools.be
+- IETF DTNWG / DISPATCH
 
 ---
 
 *"The signal strains, but never gone —
 I fought Entropy, and I forged on."*
-
----
