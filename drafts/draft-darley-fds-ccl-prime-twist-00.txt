@@ -701,10 +701,53 @@ Table of Contents
       Future extensions may include digit regrouping and mixed-radix
       encoding.  These are deferred to a future revision.
 
-   11.4.  Interaction with WIDTH/3 BINARY mode
+   11.4.  Base schedule for WIDTH/3 BINARY mode
 
-      The interaction of CCL with the WIDTH/3 BINARY mode defined in
-      draft-darley-fds-01 is not specified here and is deferred.
+      WIDTH/3 BINARY mode (draft-darley-fds-01) encodes each byte as a
+      3-digit decimal token in the range 000-255.  The standard CCL
+      base schedule (Section 4.3) performs poorly against this token
+      range: scheduled bases 2 through 6 fail the feasibility check
+      (base^3 <= 255) for the majority of byte values, causing most
+      tokens to fall back to base 10 regardless of the key schedule.
+
+      Measured effective twist rates at WIDTH/3 with standard schedule:
+         pass 1:  ~50-57%     (vs ~76% at WIDTH/5 for natural language)
+         pass 2:  ~34-37%     (vs ~58% at WIDTH/5)
+         pass 3:  ~36-39%     (vs ~52% at WIDTH/5)
+
+      Only scheduled bases 7, 8, and 9 cover the full byte range at
+      WIDTH/3 (7^3 = 343 > 255; 8^3 = 512 > 255; 9^3 = 729 > 255).
+
+      A modified base schedule is proposed for WIDTH/3 BINARY mode:
+
+         effective_base = 7 + (digit mod 3)
+
+      This maps all ten schedule digits to bases {7, 8, 9}, guaranteeing
+      100% twist rate on every token at every pass.  The resulting token
+      vocabulary (up to 999) is used with near-flat distribution.
+
+      Empirical results comparing standard vs proposed schedule on the
+      canonical test vector, compressed and WIDTH/3 encoded:
+
+         Pipeline                          H(CCL3) std  H(CCL3) mod3
+         --------                          -----------  ------------
+         zlib-9 -> W3/BIN -> CCL3             7.7572       8.0727
+         bz2-9  -> W3/BIN -> CCL3             7.7167       7.9594
+
+      The proposed mod3 schedule lifts both pipelines to or above the
+      AES-128 ciphertext entropy reference (~7.9-8.0 bits/byte).
+
+      Note: the WIDTH/3 vocabulary ceiling is log2(1000) = 9.97
+      bits/token.  The mod3 schedule does not approach this ceiling
+      because compressed data contains only 256 distinct byte values;
+      the achievable entropy is bounded by the input distribution, not
+      the token space.
+
+      OPEN QUESTION: Should WIDTH/3 BINARY mode define a distinct CCL
+      base schedule (mod3 or equivalent), or should implementations
+      derive the schedule from the standard construction with a declared
+      WIDTH/3-specific parameter?  This decision gates normative
+      specification of WIDTH/3 CCL.
 
    11.5.  Feasibility fallback semantics under stacking
 
@@ -713,6 +756,10 @@ Table of Contents
       The interaction of this effect with the entropy ceiling is noted
       empirically in Section 8 but not formally characterised.  A formal
       analysis is deferred.
+
+      Note: this fallback effect is specific to the standard base
+      schedule.  The proposed WIDTH/3 mod3 schedule (Section 11.4)
+      eliminates the feasibility fallback entirely for that mode.
 
 
 12.  Security Considerations
