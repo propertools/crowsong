@@ -6,7 +6,7 @@ prime_twist.py — Channel Camouflage Layer: prime-derived base-switching
 A test implementation of the prime-twisting construction for the
 Channel Camouflage Layer (CCL). Not a production cryptographic tool.
 
-Construction:
+Construction (single pass):
 
     For a UCS-DEC token stream and a prime P:
       - Use the decimal digits of P as a key schedule (ouroboros)
@@ -20,42 +20,53 @@ Construction:
     The twist-map is stored in the RSRC block of the output artifact.
     Decoding reads the twist-map and applies the inverse base conversion.
 
-    The twisted token stream is still valid UCS-DEC: decimal digits,
-    whitespace-separated, fixed width. It is not encrypted. It is
-    statistically less recognisable than uniform base-10 encoding.
+Stacking (multiple passes):
+
+    Multiple passes may be applied using distinct primes. Each pass
+    takes the token stream output of the previous pass as input. The
+    output is a single stack file containing all pass artifacts as
+    clearly delimited sections. Unwinding applies passes in reverse
+    order. Maximum stack depth: 10.
 
     CCL provides no cryptographic confidentiality or integrity protection.
+    Stacking increases statistical salience reduction but does not
+    change the fundamental security properties of CCL.
     See draft-darley-shard-bundle-01 for normative security properties.
 
 Usage:
     python prime_twist.py twist   --prime <P> [--width N] [--ref ID]
     python prime_twist.py untwist <infile>
+    python prime_twist.py stack   --primes P1,P2,... [--ref ID] [--med M]
+    python prime_twist.py stack   --verse-file <file> [--ref ID] [--med M]
+    python prime_twist.py unstack <infile>
 
-Input is read from stdin (bare UCS-DEC token stream).
-Output is a self-describing FDS Print Profile artifact.
+Input for twist/stack is read from stdin (bare UCS-DEC token stream).
+Output is a self-describing FDS Print Profile artifact or stack file.
 
 Examples:
-    # Twist using a prime derived from a verse
-    cat archive/flash-paper-SI-2084-FP-001-payload.txt | \\
-      python prime_twist.py twist --prime 74851412...701 > twisted.txt
+    # Single pass
+    cat payload.txt | python prime_twist.py twist --prime 748...701
 
     # Untwist
     python prime_twist.py untwist twisted.txt
 
-    # Full pipeline: verse -> prime -> twist
-    echo "Factoring primes" | python verse_to_prime.py derive --ref K1 > k1.txt
-    PRIME=$(grep '  P:' k1.txt | awk '{print $2}')
-    cat archive/flash-paper-SI-2084-FP-001-payload.txt | \\
-      python prime_twist.py twist --prime $PRIME --ref CCL-TEST > twisted.txt
-    python prime_twist.py untwist twisted.txt | \\
-      python ucs_dec_tool.py -d
+    # Stack: three primes
+    cat payload.txt | python prime_twist.py stack \\
+        --primes 748...701,571...377,301...123 --ref CCL3
+
+    # Stack: derive primes from a verse file (one verse per line)
+    cat payload.txt | python prime_twist.py stack \\
+        --verse-file verses.txt --ref CCL3
+
+    # Unstack
+    python prime_twist.py unstack stacked.txt | python ucs_dec_tool.py -d
 
 Compatibility: Python 2.7+ / 3.x
 Author: Proper Tools SRL
 License: MIT
 
 NOTE: This is a test implementation. The CCL construction and
-twist-map format are not yet normatively specified. The interface
+stack file format are not yet normatively specified. The interface
 and file format may change in future revisions.
 """
 
@@ -63,6 +74,7 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import binascii
+import hashlib
 import sys
 import time
 import unicodedata
@@ -70,17 +82,74 @@ import unicodedata
 PY2 = (sys.version_info[0] == 2)
 
 if PY2:
-    text_type = unicode  # noqa: F821
-    to_chr    = unichr   # noqa: F821
+    text_type = unicode   # noqa: F821
+    to_chr    = unichr    # noqa: F821
 else:
     text_type = str
     to_chr    = chr
 
 _DIGIT_CHARS = "0123456789"
-
 BOX_INNER    = 41
 MIDDLE_DOT   = "\u00b7"
 DESTROY_FLAG = "IF COUNT FAILS: DESTROY IMMEDIATELY"
+MAX_DEPTH    = 10
+
+STACK_BEGIN  = "=== CCL STACK BEGIN {d} DEPTH/{depth} {d} REF/{ref} ==="
+STACK_PASS   = "=== CCL STACK PASS {n}/{depth} ==="
+STACK_END    = "=== CCL STACK END {d} REF/{ref} ==="
+
+
+# ── Miller-Rabin (for --verse-file prime derivation) ─────────────────────────
+
+_MR_WITNESSES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
+
+
+def _is_prime(n):
+    if n < 2:
+        return False
+    for p in _MR_WITNESSES:
+        if n == p:
+            return True
+        if n % p == 0:
+            return False
+    d, r = n - 1, 0
+    while d % 2 == 0:
+        d //= 2
+        r += 1
+    for a in _MR_WITNESSES:
+        if a >= n:
+            continue
+        x = pow(a, d, n)
+        if x == 1 or x == n - 1:
+            continue
+        composite = True
+        for _ in range(r - 1):
+            x = pow(x, 2, n)
+            if x == n - 1:
+                composite = False
+                break
+        if composite:
+            return False
+    return True
+
+
+def _next_prime(n):
+    if n <= 2:
+        return 2
+    n = n | 1
+    while not _is_prime(n):
+        n += 2
+    return n
+
+
+def _verse_to_prime(verse):
+    """Derive a prime from a verse via NFC -> UCS-DEC -> SHA256 -> next_prime."""
+    normalised   = unicodedata.normalize("NFC", verse.strip())
+    token_stream = " ".join(
+        "{0:05d}".format(ord(ch)) for ch in normalised)
+    digest = hashlib.sha256(token_stream.encode("utf-8")).hexdigest()
+    N      = int(digest, 16)
+    return _next_prime(N)
 
 
 # ── Base conversion ───────────────────────────────────────────────────────────
@@ -112,21 +181,15 @@ def _prime_digits(prime_str):
 
 
 def _scheduled_base(digit):
-    """
-    Return the scheduled base for a prime digit.
-
-    Digit 0 or 1 → base 10 (no twist).
-    Digit 2–9    → base equal to digit.
-    """
+    """Digit 0 or 1 -> base 10 (no twist). Digit 2-9 -> that base."""
     return 10 if digit <= 1 else digit
 
 
 def _effective_base(scheduled, token_value, width):
     """
     Return the base actually used for encoding.
-
     Falls back to base 10 if scheduled base cannot represent
-    token_value within width digits (scheduled^width <= token_value).
+    token_value within width digits.
     """
     if scheduled == 10:
         return 10
@@ -135,33 +198,27 @@ def _effective_base(scheduled, token_value, width):
     return 10
 
 
-# ── Twist / untwist ───────────────────────────────────────────────────────────
+# ── Single-pass twist / untwist ───────────────────────────────────────────────
 
 def twist(token_stream, prime_str, width=5):
     """
     Apply prime-derived base-switching to a UCS-DEC token stream.
 
-    Args:
-        token_stream: string of whitespace-separated UCS-DEC tokens
-        prime_str:    decimal string representation of the prime P
-        width:        token field width (default: 5)
-
     Returns:
-        tuple of (twisted_tokens, twist_map)
+        (twisted_tokens, twist_map)
         twisted_tokens: list of zero-padded strings in scheduled bases
         twist_map:      list of ints — actual base used per token
     """
-    tokens   = token_stream.split()
-    p_digits = _prime_digits(prime_str)
-    p_len    = len(p_digits)
-
+    tokens    = token_stream.split()
+    p_digits  = _prime_digits(prime_str)
+    p_len     = len(p_digits)
     twisted   = []
     twist_map = []
 
     for i, tok in enumerate(tokens):
-        n       = int(tok)
-        sched   = _scheduled_base(p_digits[i % p_len])
-        base    = _effective_base(sched, n, width)
+        n     = int(tok)
+        sched = _scheduled_base(p_digits[i % p_len])
+        base  = _effective_base(sched, n, width)
         twisted.append(_to_base(n, base, width))
         twist_map.append(base)
 
@@ -171,11 +228,6 @@ def twist(token_stream, prime_str, width=5):
 def untwist(twisted_tokens, twist_map, width=5):
     """
     Reverse prime-derived base-switching using a recorded twist-map.
-
-    Args:
-        twisted_tokens: list of twisted token strings
-        twist_map:      list of ints — base used per token (from RSRC block)
-        width:          token field width (default: 5)
 
     Returns:
         List of base-10 UCS-DEC token strings, zero-padded to width.
@@ -190,33 +242,15 @@ def untwist(twisted_tokens, twist_map, width=5):
 # ── Twist-map encoding ────────────────────────────────────────────────────────
 
 def encode_twist_map(twist_map):
-    """
-    Encode a twist-map as a compact sparse string.
-
-    Only non-base-10 entries are stored, as 'position:base' pairs.
-    Base-10 entries are implicit (fall back to base 10).
-
-    Returns: string like '3:5,5:4,8:5,...'
-    """
-    pairs = [
+    """Compact sparse encoding: only non-base-10 entries as 'pos:base'."""
+    return ",".join(
         "{0}:{1}".format(i, b)
         for i, b in enumerate(twist_map)
-        if b != 10
-    ]
-    return ",".join(pairs)
+        if b != 10)
 
 
 def decode_twist_map(encoded, total_count):
-    """
-    Decode a compact sparse twist-map string back to a full list.
-
-    Args:
-        encoded:     compact twist-map string (from RSRC block)
-        total_count: total number of tokens (to fill implicit base-10 entries)
-
-    Returns:
-        List of ints of length total_count.
-    """
+    """Decode a compact sparse twist-map string to a full list."""
     result = [10] * total_count
     if not encoded.strip():
         return result
@@ -227,8 +261,7 @@ def decode_twist_map(encoded, total_count):
         parts = pair.split(":")
         if len(parts) == 2:
             try:
-                pos  = int(parts[0])
-                base = int(parts[1])
+                pos, base = int(parts[0]), int(parts[1])
                 if 0 <= pos < total_count:
                     result[pos] = base
             except ValueError:
@@ -247,27 +280,12 @@ def _box_line(content):
 
 
 def make_artifact(twisted_tokens, twist_map, prime_str,
-                  ref="", med="PAPER", width=5):
+                  ref="", med="PAPER", width=5,
+                  stack_pass=None, stack_depth=None):
     """
     Wrap a twisted token stream in a self-describing FDS Print Profile
     artifact with an RSRC block carrying the twist-map and prime.
-
-    Args:
-        twisted_tokens: list of twisted token strings
-        twist_map:      list of ints — base used per token
-        prime_str:      decimal string of the prime P
-        ref:            artifact reference ID (optional)
-        med:            medium designation (default: PAPER)
-        width:          token field width
-
-    Returns:
-        Complete artifact as a unicode string.
     """
-    payload    = "  ".join(
-        "  ".join(twisted_tokens[i:i + 6])
-        for i in range(0, len(twisted_tokens), 6)
-    )
-    # Reformat as proper rows of 6
     rows = []
     for i in range(0, len(twisted_tokens), 6):
         rows.append("  ".join(twisted_tokens[i:i + 6]))
@@ -275,13 +293,10 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
 
     pad        = "0" * width
     real_count = len([t for t in twisted_tokens if t != pad])
-    crc        = binascii.crc32(
-        payload.encode("utf-8")) & 0xFFFFFFFF
+    crc        = binascii.crc32(payload.encode("utf-8")) & 0xFFFFFFFF
     crc_str    = format(crc, "08X")
     generated  = time.strftime("%Y-%m-%d")
-
-    twist_map_enc = encode_twist_map(twist_map)
-    changed       = sum(1 for b in twist_map if b != 10)
+    changed    = sum(1 for b in twist_map if b != 10)
 
     enc_line = "ENC: UCS {d} DEC {d} COL/6 {d} PAD/{p} {d} WIDTH/{w}".format(
         d=MIDDLE_DOT, p=pad, w=width)
@@ -298,14 +313,20 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
         "  TOKENS:     {0}".format(len(twisted_tokens)),
         "  TWISTED:    {0}".format(changed),
         "  GENERATED:  {0}".format(generated),
-        "  TWIST-MAP:  {0}".format(twist_map_enc),
-        "RSRC: END",
     ]
+    if stack_pass is not None and stack_depth is not None:
+        rsrc_lines.append(
+            "  STACK-PASS: {0}/{1}".format(stack_pass, stack_depth))
+    rsrc_lines.append(
+        "  TWIST-MAP:  {0}".format(encode_twist_map(twist_map)))
+    rsrc_lines.append("RSRC: END")
 
     header_lines = [_box_rule()]
     if ref:
+        header_lines.append(_box_line("REF: {0}  PAGE 1/1".format(ref)))
+    if stack_pass is not None:
         header_lines.append(_box_line(
-            "REF: {0}  PAGE 1/1".format(ref)))
+            "CCL PASS {0}/{1}".format(stack_pass, stack_depth)))
     header_lines.append(_box_line(enc_line))
     header_lines.append(_box_line("MED: {0}".format(med)))
     header_lines.append(_box_line(
@@ -320,7 +341,7 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
         _box_rule(),
     ]
 
-    parts = [
+    return "\n".join([
         "RESERVED -- SINGLE USE",
         "\n".join(header_lines),
         "",
@@ -331,18 +352,11 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
         "\n".join(footer_lines),
         "",
         "                   RESERVED -- SINGLE USE",
-    ]
-
-    return "\n".join(parts)
+    ])
 
 
 def parse_artifact(content):
-    """
-    Parse a prime-twist artifact.
-
-    Returns dict with:
-        prime_str, width, twist_map_enc, twisted_tokens, token_count
-    """
+    """Parse a prime-twist artifact. Returns dict."""
     fields        = {}
     twisted_lines = []
     in_rsrc       = False
@@ -350,23 +364,17 @@ def parse_artifact(content):
 
     for line in content.splitlines():
         stripped = line.strip()
-
         if stripped == "RSRC: BEGIN":
-            in_rsrc   = True
-            in_payload = False
+            in_rsrc, in_payload = True, False
             continue
         if stripped == "RSRC: END":
-            in_rsrc   = False
-            in_payload = True
+            in_rsrc, in_payload = False, True
             continue
-
         if in_rsrc and ":" in stripped:
             key, _, val = stripped.partition(":")
             fields[key.strip()] = val.strip()
             continue
-
         if in_payload:
-            # Payload lines: all tokens are digit strings
             toks = stripped.split()
             if toks and all(t.isdigit() for t in toks):
                 twisted_lines.extend(toks)
@@ -374,16 +382,67 @@ def parse_artifact(content):
                     and not stripped.startswith("|") \
                     and "RESERVED" not in stripped \
                     and "VALUES" not in stripped:
-                # Could be end of payload
                 pass
 
     return {
-        "prime_str":    fields.get("PRIME", ""),
-        "width":        int(fields.get("WIDTH", "5")),
+        "prime_str":     fields.get("PRIME", ""),
+        "width":         int(fields.get("WIDTH", "5")),
         "twist_map_enc": fields.get("TWIST-MAP", ""),
         "twisted_tokens": twisted_lines,
-        "token_count":  len(twisted_lines),
+        "token_count":   len(twisted_lines),
     }
+
+
+# ── Stack file format ─────────────────────────────────────────────────────────
+
+def make_stack_file(artifacts, ref, depth):
+    """
+    Assemble multiple pass artifacts into a single self-describing stack file.
+
+    Format:
+        === CCL STACK BEGIN · DEPTH/N · REF/ref ===
+        [pass 1 artifact]
+        === CCL STACK PASS 2/N ===
+        [pass 2 artifact]
+        ...
+        === CCL STACK END · REF/ref ===
+    """
+    sections = [STACK_BEGIN.format(
+        d=MIDDLE_DOT, depth=depth, ref=ref)]
+    for i, artifact in enumerate(artifacts):
+        if i > 0:
+            sections.append(STACK_PASS.format(n=i + 1, depth=depth))
+        sections.append(artifact)
+    sections.append(STACK_END.format(d=MIDDLE_DOT, ref=ref))
+    return "\n".join(sections)
+
+
+def parse_stack_file(content):
+    """
+    Parse a stack file into a list of artifact strings in pass order (1..N).
+    """
+    artifacts = []
+    current   = []
+    in_stack  = False
+
+    for line in content.splitlines():
+        if line.startswith("=== CCL STACK BEGIN"):
+            in_stack = True
+            current  = []
+            continue
+        if line.startswith("=== CCL STACK PASS"):
+            if current:
+                artifacts.append("\n".join(current))
+            current = []
+            continue
+        if line.startswith("=== CCL STACK END"):
+            if current:
+                artifacts.append("\n".join(current))
+            break
+        if in_stack:
+            current.append(line)
+
+    return artifacts
 
 
 # ── I/O ───────────────────────────────────────────────────────────────────────
@@ -426,60 +485,86 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  cat payload.txt | python prime_twist.py twist"
-            " --prime 748...701 > twisted.txt\n"
+            "  # Single pass\n"
+            "  cat payload.txt | python prime_twist.py twist --prime P\n"
             "  python prime_twist.py untwist twisted.txt\n"
             "\n"
-            "  # Full pipeline\n"
-            "  PRIME=$(echo 'my verse' | python verse_to_prime.py derive"
-            " | grep '  P:' | awk '{print $2}')\n"
-            "  cat payload.txt | python prime_twist.py twist"
-            " --prime $PRIME > twisted.txt\n"
-            "  python prime_twist.py untwist twisted.txt"
-            " | python ucs_dec_tool.py -d\n"
-        )
+            "  # Stack: N passes with N primes (max {0})\n"
+            "  cat payload.txt | python prime_twist.py stack \\\n"
+            "    --primes P1,P2,P3 --ref CCL3\n"
+            "  python prime_twist.py unstack stacked.txt\n"
+            "\n"
+            "  # Stack: derive primes from verse file (one verse per line)\n"
+            "  cat payload.txt | python prime_twist.py stack \\\n"
+            "    --verse-file verses.txt --ref CCL3\n"
+        ).format(MAX_DEPTH)
     )
 
     subparsers = parser.add_subparsers(dest="command")
     subparsers.required = True
 
+    # ── twist ──────────────────────────────────────────────────────────────
     p_twist = subparsers.add_parser(
         "twist",
-        help="apply prime-twist to a UCS-DEC token stream from stdin"
+        help="apply a single CCL pass to stdin token stream"
     )
     p_twist.add_argument(
         "--prime", required=True, metavar="P",
-        help="prime number as decimal string (use verse_to_prime.py to derive)"
+        help="prime as decimal string"
     )
     p_twist.add_argument(
         "--width", type=positive_int, default=5, metavar="N",
-        help="UCS-DEC token field width (default: 5)"
+        help="UCS-DEC field width (default: 5)"
     )
-    p_twist.add_argument(
-        "--ref", default="", metavar="ID",
-        help="artifact reference ID"
-    )
-    p_twist.add_argument(
-        "--med", default="PAPER", metavar="MEDIUM",
-        help="medium designation (default: PAPER)"
-    )
+    p_twist.add_argument("--ref", default="", metavar="ID")
+    p_twist.add_argument("--med", default="PAPER", metavar="MEDIUM")
 
+    # ── untwist ────────────────────────────────────────────────────────────
     p_untwist = subparsers.add_parser(
         "untwist",
-        help="reverse prime-twist and emit bare UCS-DEC token stream"
+        help="reverse a single CCL pass; emit bare token stream"
     )
     p_untwist.add_argument("infile", help="twisted artifact file")
 
+    # ── stack ──────────────────────────────────────────────────────────────
+    p_stack = subparsers.add_parser(
+        "stack",
+        help="apply N CCL passes (max {0}); output single stack file".format(
+            MAX_DEPTH)
+    )
+    prime_group = p_stack.add_mutually_exclusive_group(required=True)
+    prime_group.add_argument(
+        "--primes", metavar="P1,P2,...",
+        help="comma-separated prime list"
+    )
+    prime_group.add_argument(
+        "--verse-file", metavar="FILE",
+        help="file with one verse per line; primes derived automatically"
+    )
+    p_stack.add_argument(
+        "--width", type=positive_int, default=5, metavar="N",
+        help="UCS-DEC field width (default: 5)"
+    )
+    p_stack.add_argument("--ref", default="CCL-STACK", metavar="ID")
+    p_stack.add_argument("--med", default="PAPER", metavar="MEDIUM")
+
+    # ── unstack ────────────────────────────────────────────────────────────
+    p_unstack = subparsers.add_parser(
+        "unstack",
+        help="unwind all passes in a stack file; emit bare token stream"
+    )
+    p_unstack.add_argument("infile", help="stack file")
+
     return parser
 
+
+# ── Command implementations ───────────────────────────────────────────────────
 
 def cmd_twist(args):
     data = _read_stdin().strip()
     if not data:
         print("Error: empty input", file=sys.stderr)
         return 1
-
-    # Validate prime (basic check)
     try:
         int(args.prime)
     except ValueError:
@@ -488,7 +573,6 @@ def cmd_twist(args):
 
     twisted_tokens, twist_map = twist(data, args.prime, width=args.width)
     changed = sum(1 for b in twist_map if b != 10)
-
     print("Tokens: {0}, twisted: {1} ({2:.1f}%)".format(
         len(twist_map), changed,
         100.0 * changed / len(twist_map) if twist_map else 0),
@@ -497,7 +581,6 @@ def cmd_twist(args):
     artifact = make_artifact(
         twisted_tokens, twist_map, args.prime,
         ref=args.ref, med=args.med, width=args.width)
-
     _write_stdout(artifact)
     if not artifact.endswith("\n"):
         _write_stdout("\n")
@@ -513,27 +596,140 @@ def cmd_untwist(args):
         return 1
 
     parsed = parse_artifact(content)
-
     if not parsed["twisted_tokens"]:
         print("Error: no payload found in artifact", file=sys.stderr)
         return 1
-
     if not parsed["prime_str"]:
-        print("Error: no PRIME found in RSRC block", file=sys.stderr)
+        print("Error: no PRIME in RSRC block", file=sys.stderr)
         return 1
 
     twist_map = decode_twist_map(
-        parsed["twist_map_enc"],
-        parsed["token_count"])
-
+        parsed["twist_map_enc"], parsed["token_count"])
     tokens = untwist(parsed["twisted_tokens"], twist_map, parsed["width"])
 
-    print("Tokens: {0}, untwisted from {1} non-base-10 positions".format(
-        len(tokens),
-        sum(1 for b in twist_map if b != 10)),
+    print("Tokens: {0}, untwisted from {1} positions".format(
+        len(tokens), sum(1 for b in twist_map if b != 10)),
         file=sys.stderr)
-
     _write_stdout("  ".join(tokens))
+    _write_stdout("\n")
+    return 0
+
+
+def cmd_stack(args):
+    data = _read_stdin().strip()
+    if not data:
+        print("Error: empty input", file=sys.stderr)
+        return 1
+
+    # Resolve primes
+    if args.primes:
+        prime_list = [p.strip() for p in args.primes.split(",") if p.strip()]
+    else:
+        try:
+            with open(args.verse_file, encoding="utf-8") as f:
+                verses = [l.rstrip("\n") for l in f if l.strip()]
+        except IOError as err:
+            print("Error: {0}".format(err), file=sys.stderr)
+            return 1
+        prime_list = []
+        for i, verse in enumerate(verses):
+            p = _verse_to_prime(verse)
+            prime_list.append(str(p))
+            print("  Derived P{0}: {1}... ({2} digits)".format(
+                i + 1, str(p)[:20], len(str(p))), file=sys.stderr)
+
+    depth = len(prime_list)
+    if depth < 1:
+        print("Error: at least one prime required", file=sys.stderr)
+        return 1
+    if depth > MAX_DEPTH:
+        print("Error: maximum stack depth is {0}".format(MAX_DEPTH),
+              file=sys.stderr)
+        return 1
+
+    for i, p in enumerate(prime_list):
+        try:
+            int(p)
+        except ValueError:
+            print("Error: prime {0} is not a valid integer".format(i + 1),
+                  file=sys.stderr)
+            return 1
+
+    print("Stack depth: {0}".format(depth), file=sys.stderr)
+
+    artifacts      = []
+    current_tokens = data
+
+    for i, prime in enumerate(prime_list):
+        twisted_tokens, twist_map = twist(
+            current_tokens, prime, width=args.width)
+        changed = sum(1 for b in twist_map if b != 10)
+        print("  Pass {0}/{1}: {2} tokens, {3} twisted ({4:.1f}%)".format(
+            i + 1, depth, len(twist_map), changed,
+            100.0 * changed / len(twist_map) if twist_map else 0),
+            file=sys.stderr)
+
+        artifact = make_artifact(
+            twisted_tokens, twist_map, prime,
+            ref="{0}-P{1}".format(args.ref, i + 1),
+            med=args.med,
+            width=args.width,
+            stack_pass=i + 1,
+            stack_depth=depth)
+        artifacts.append(artifact)
+        current_tokens = "  ".join(twisted_tokens)
+
+    stack_file = make_stack_file(artifacts, args.ref, depth)
+    _write_stdout(stack_file)
+    if not stack_file.endswith("\n"):
+        _write_stdout("\n")
+    return 0
+
+
+def cmd_unstack(args):
+    try:
+        with open(args.infile, encoding="utf-8") as f:
+            content = f.read()
+    except IOError as err:
+        print("Error: {0}".format(err), file=sys.stderr)
+        return 1
+
+    artifacts = parse_stack_file(content)
+    if not artifacts:
+        print("Error: no stack passes found in file", file=sys.stderr)
+        return 1
+
+    depth = len(artifacts)
+    print("Stack depth: {0}".format(depth), file=sys.stderr)
+
+    # Parse all passes first
+    parsed_passes = []
+    for i, artifact_text in enumerate(artifacts):
+        parsed = parse_artifact(artifact_text)
+        if not parsed["twisted_tokens"]:
+            print("Error: no payload in pass {0}".format(i + 1),
+                  file=sys.stderr)
+            return 1
+        if not parsed["prime_str"]:
+            print("Error: no PRIME in pass {0} RSRC block".format(i + 1),
+                  file=sys.stderr)
+            return 1
+        parsed_passes.append(parsed)
+
+    # Unwind in reverse — outermost pass first
+    current_tokens = parsed_passes[-1]["twisted_tokens"]
+
+    for i, parsed in enumerate(reversed(parsed_passes)):
+        twist_map = decode_twist_map(
+            parsed["twist_map_enc"], len(current_tokens))
+        current_tokens = untwist(
+            current_tokens, twist_map, parsed["width"])
+        changed = sum(1 for b in twist_map if b != 10)
+        print("  Unstack pass {0}/{1}: {2} tokens, {3} untwisted".format(
+            depth - i, depth, len(current_tokens), changed),
+            file=sys.stderr)
+
+    _write_stdout("  ".join(current_tokens))
     _write_stdout("\n")
     return 0
 
@@ -547,6 +743,10 @@ def main():
             return cmd_twist(args)
         if args.command == "untwist":
             return cmd_untwist(args)
+        if args.command == "stack":
+            return cmd_stack(args)
+        if args.command == "unstack":
+            return cmd_unstack(args)
     except (ValueError, IOError) as err:
         print("Error: {0}".format(err), file=sys.stderr)
         return 1
