@@ -169,13 +169,6 @@ Self-description supports verification, recovery, and continuity.
 
 ---
 
-A contribution is useful if it makes the system more likely to carry a
-signal across a gap.
-
-That is the test.
-
----
-
 ## Principle 11: Optionality is a design problem, not a keyword.
 
 SHOULD is a design smell.
@@ -222,3 +215,36 @@ time. Do not fail. Do not block. Do not propagate the bad clock.
 
 A message with a wrong timestamp is still a message.
 A system that refuses to process it has failed the signal.
+
+---
+
+## Principle 13: Availability and integrity before confidentiality.
+
+The classical security triad — Confidentiality, Integrity,
+Availability — is typically prioritised in that order. This stack
+inverts it deliberately.
+
+A signal that cannot be delivered is worthless regardless of how well
+it is protected. A signal whose integrity cannot be verified is
+dangerous regardless of how well it is encrypted. Confidentiality
+matters, but it is a separable concern — a layer added when needed,
+not a precondition for the system to function.
+
+Design for delivery first. Design for verifiability second. Add
+confidentiality where the threat model requires it, using components
+that do not compromise the first two properties.
+
+The corollary: a system that sacrifices availability or integrity in
+service of confidentiality has made the wrong trade. An encrypted
+message that cannot be decoded under degraded conditions is not more
+secure — it is lost.
+
+Confidentiality is a layer. Availability and integrity are the
+foundation.
+
+---
+
+A contribution is useful if it makes the system more likely to carry a
+signal across a gap.
+
+That is the test.
