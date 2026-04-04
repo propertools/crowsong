@@ -204,8 +204,9 @@ Refactor into reference implementation pending normative spec.
 | `tools/constants/constants.py` | ✅ done | 8 named constants; `list`, `digits`, `show`, `generate`, `verify` |
 | `tools/sequences/sequences.py` | ✅ done | 15 OEIS sequences; `list`, `show`, `terms`, `sync`, `verify` |
 | `tools/baseconv/baseconv.py` | ✅ done | Bases 2–36; CLI and library |
-| `tools/mnemonic/verse_to_prime.py` | ✅ done | verse → NFC → UCS-DEC → SHA256 → next\_prime → FDS artifact |
-| `tools/mnemonic/prime_twist.py` | ✅ done | CCL prime-twist; `twist`, `untwist`, `stack` (max 10), `unstack` |
+| `tools/mnemonic/mnemonic.py` | ✅ done | Shared library: `is_prime`, `next_prime`, `ucs_dec_encode`, `derive`; single canonical construction |
+| `tools/mnemonic/verse_to_prime.py` | ✅ done | verse → NFC → UCS-DEC → SHA256 → next\_prime → FDS artifact; imports from `mnemonic.py` |
+| `tools/mnemonic/prime_twist.py` | ✅ done | CCL prime-twist; `twist`, `untwist`, `stack` (max 10), `unstack`; imports from `mnemonic.py` |
 | `demo/ccl_demo.sh` | ✅ done | 9-step live demo; canonical payload; CCL3 achieves 8.37 bits/token |
 | `docs/constants/` | ✅ done | Pre-generated 10,000-digit files for all 8 constants |
 | `docs/sequences/` | ✅ done | Cached OEIS sequences, SHA256-verified |
@@ -250,6 +251,45 @@ The mod3 schedule clears the AES-128 reference on compressed binary
 payloads. This requires a WIDTH/3-specific CCL base schedule, tracked as
 an open question in `draft-darley-fds-ccl-prime-twist-00` §11.4 and gating
 normative WIDTH/3 CCL specification.
+
+**CCL schedule architecture — working consensus (from ChatGPT review):**
+
+Keep a small closed enumeration of named schedules. Each schedule is
+defined normatively as a profile over a shared conceptual model:
+
+- **Candidate-base function** `f(digit)` — maps each prime digit to a
+  candidate base
+- **Generic feasibility rule** — if `candidate_base^WIDTH ≤ token_value`,
+  use base 10 instead; otherwise use candidate base
+- **Authoritative twist-map** — records the actual base used per position;
+  used for reversal, not the schedule
+
+The schedule field in the artifact describes the **generation profile**.
+It is not needed for reversal. The twist-map is authoritative for reversal.
+Receivers MUST treat the twist-map as authoritative and MUST NOT attempt
+to reconstruct actual bases from the schedule field alone.
+
+Current named schedules:
+
+| Name | Candidate-base function | Notes |
+|------|------------------------|-------|
+| `standard` | `d ≤ 1 → 10; else → d` | Default; suits WIDTH/5 natural language |
+| `mod3` | `7 + (d mod 3)` | 100% twist; suits WIDTH/3 BINARY |
+
+Fallback is **implicit and global** for all schedules — it is a
+representation constraint, not a schedule parameter. No `FALLBACK:` field
+is needed in artifacts.
+
+Parameterisation deferred: a literal mapping syntax (`SCHEDULE: cycle/7,8,9`)
+is the candidate if a third validated case forces it. Not before then.
+
+Proposed normative sentence for the spec:
+
+> A CCL schedule defines a candidate base for each key-schedule digit;
+> the actual base used is determined by the generic feasibility rule,
+> with base 10 used whenever the candidate base cannot represent the
+> token value within the declared WIDTH. The twist-map is authoritative
+> for reversal.
 
 ---
 
