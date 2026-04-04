@@ -67,9 +67,16 @@ drafts/                       Internet-Drafts
 drafts/meridian-protocol/     Meridian Protocol (submodule)
 tools/ucs-dec/                reference implementation (FDS)
 tools/baseconv/               base conversion utility
+tools/primes/                 Miller-Rabin primality testing
+tools/constants/              named mathematical constant digit generator
+tools/sequences/              OEIS sequence mirror
+tools/mnemonic/               verse-to-prime derivation and CCL prime-twist
 docs/                         supporting material and guides
+docs/constants/               pre-generated constant digit files (10,000 digits each)
+docs/sequences/               cached OEIS sequences
 archive/                      canonical test vectors
 tests/roundtrip/              verification scripts
+demo/                         runnable demonstrations
 ```
 
 ---
@@ -146,6 +153,44 @@ Signal survives.
 
 ---
 
+## Channel Camouflage Layer — quick demo
+
+```bash
+# Derive a prime from a verse (the key lives in memory)
+echo "The signal strains, but never gone." | \
+  python tools/mnemonic/verse_to_prime.py derive --ref K1
+
+# Apply triple-pass CCL to the canonical payload
+# (three verses → three primes → three passes → 8.37 bits/token)
+cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
+  python tools/mnemonic/prime_twist.py stack \
+    --verse-file verses.txt \
+    --ref CCL3
+
+# Recover
+python tools/mnemonic/prime_twist.py unstack stacked.txt | \
+  python tools/ucs-dec/ucs_dec_tool.py -d
+
+# Full capability demo (9 steps, one terminal window)
+bash demo/ccl_demo.sh
+```
+
+What CCL3 achieves on the canonical 534-token payload:
+
+| Stage | Entropy | Unique tokens |
+|-------|---------|---------------|
+| Original UCS-DEC | 4.78 bits/token | 53 |
+| CCL1 | 6.96 bits/token | 172 |
+| CCL2 | 7.82 bits/token | 282 |
+| CCL3 | **8.37 bits/token** | 375 |
+| AES-128 reference | ~7.9–8.0 bits/byte | — |
+
+CCL provides no cryptographic confidentiality. It reduces salience.
+The keys are verses. The verses live in memory.
+The primes exist nowhere until the moment of derivation.
+
+---
+
 ## The design in one sentence
 
 Every layer of the system must be operable by a human with patience and
@@ -200,6 +245,9 @@ Expected result: legible text.
 
 **Mnemonic key wrapping and CCL:**
 `docs/mnemonic-shamir-sketch.md`
+
+**CCL full capability demo:**
+`demo/ccl_demo.sh`
 
 **Roadmap:**
 `docs/crowsong-roadmap.md`
