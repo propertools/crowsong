@@ -89,7 +89,8 @@ Table of Contents
    8.  Empirical Results
      8.1.  Test Vector
      8.2.  Entropy Measurements
-     8.3.  Comparison with Reference Points
+     8.3.  Interaction with Prior Compression
+     8.4.  Comparison with Reference Points
    9.  Steganographic Injection
    10. Layer Separation
    11. Open Questions
@@ -570,7 +571,40 @@ Table of Contents
 
    Total gain: +75.0% (4.78 -> 8.37 bits/token)
 
-8.3.  Comparison with Reference Points
+8.3.  Interaction with Prior Compression
+
+   CCL may be applied to payloads that have been compressed and
+   base64url-encoded before FDS encoding, per the B64 flag defined
+   in draft-darley-fds-00 Section 6.  The following measurements
+   compare this pipeline against the plain FDS baseline, using the
+   same canonical test vector and the same three-pass key schedule.
+
+      Pipeline                          Tokens  Pre-CCL3 H  Post-CCL3 H
+      --------                          ------  ----------  -----------
+      poem -> FDS -> CCL3 (baseline)       534      4.7830       8.3714
+      poem -> zlib-9 -> b64 -> FDS -> CCL3 504      5.9120       8.5015
+      poem -> bz2-9  -> b64 -> FDS -> CCL3 564      5.8542       8.5647
+
+   The marginal post-CCL3 entropy gains from prior compression are
+   small: +0.13 and +0.19 bits/token respectively.  This is expected.
+
+   The limiting factor is the base64url alphabet.  Base64url uses 65
+   distinct characters, producing at most 65 unique FDS token values
+   before CCL is applied.  The theoretical pre-CCL entropy ceiling
+   for a base64url stream is log2(65) ~= 6.02 bits/token.  CCL
+   expands this distribution through base-switching, but the narrow
+   input vocabulary limits the achievable gain relative to the plain
+   FDS baseline.
+
+   RECOMMENDATION: For natural language payloads, prior compression
+   adds complexity without meaningful entropy benefit; CCL3 alone is
+   sufficient.  For binary payloads (firmware images, encrypted data,
+   compressed archives), prior compression is RECOMMENDED as specified
+   in draft-darley-fds-00 Section 6 -- the B64 pipeline is designed
+   for this case and achieves meaningful size reduction.  Apply CCL
+   after FDS encoding in both cases.
+
+8.4.  Comparison with Reference Points
 
    For context, approximate Shannon entropy of common data types:
 
