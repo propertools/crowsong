@@ -1,6 +1,6 @@
 # tools/mnemonic/ — verse-derived keys and Channel Camouflage Layer
 
-Two tools sharing a common construction:
+Three files sharing a common construction:
 
 ```
 verse
@@ -12,17 +12,45 @@ verse
   → prime P
 ```
 
+`mnemonic.py` is the shared library that owns this construction — the
+single canonical implementation of primality testing, prime derivation,
+and verse-to-prime. It is imported by the other two tools; neither
+duplicates the construction logic.
+
 `verse_to_prime.py` derives the prime and packages it as a self-describing
 FDS Print Profile artifact. `prime_twist.py` uses a prime as a cyclic key
 schedule to apply base-switching transforms to any FDS token stream.
 
-Both tools: Python 2.7+/3.x, no external dependencies, MIT licence.
+All three: Python 2.7+/3.x, no external dependencies, MIT licence.
 
 **These are test implementations.** The CCL construction and artifact
 format are not yet normatively specified. See
 `drafts/draft-darley-fds-ccl-prime-twist-00.txt` for the pre-normative
 specification and `docs/mnemonic-shamir-sketch.md` for the broader
 Mnemonic Share Wrapping design.
+
+---
+
+## mnemonic.py
+
+The shared construction library. Not a CLI tool — import only.
+
+```python
+from mnemonic import is_prime, next_prime, ucs_dec_encode, derive
+```
+
+| Export | Description |
+|--------|-------------|
+| `WITNESSES_SMALL` | Fixed Miller-Rabin witness tuple |
+| `is_prime(n)` | Miller-Rabin primality test |
+| `next_prime(n)` | Smallest prime ≥ n |
+| `ucs_dec_encode(text, width)` | UCS-DEC token stream encoder |
+| `derive(verse, width)` | Full verse-to-prime construction; returns dict with `normalised`, `token_stream`, `token_count`, `digest_hex`, `N`, `P`, `width` |
+
+Primality: deterministic (no false positives) for n < ~3.3 × 10²⁴.
+For larger n — including all SHA256-derived inputs (~77 digits) — this
+is a well-tested heuristic using the fixed witness set. No counterexample
+is known; inputs are not adversarially chosen.
 
 ---
 
@@ -78,11 +106,16 @@ own output: the prime is encoded in the same format used to derive it.
 ### Properties
 
 - The verse may be any length. SHA256 normalises to ~77 digits.
-- The prime exists nowhere until derived. Recite the verse to recover it.
+- The prime need not be stored; it can be reconstructed deterministically
+  from the verse at any time.
 - Deterministic: the same verse always produces the same prime.
-- The primality test is deterministic for n < 3.3 × 10²⁴ and
-  probabilistic (error ≤ 4⁻⁶⁴) for larger inputs including all
-  SHA256-derived values.
+- The primality test is deterministic for n < ~3.3 × 10²⁴. For larger n,
+  including all SHA256-derived inputs, a well-tested fixed-witness heuristic
+  is used — no counterexample is known, and inputs are not adversarially
+  chosen. See `mnemonic.py` for the single canonical implementation.
+- The artifact carries both N and P in its RSRC block. It is a
+  reproducibility artifact, not a secrecy wrapper. Confidentiality
+  is a separate layer.
 
 ---
 
@@ -191,8 +224,8 @@ verse (any length, any Unicode)
     ▼ SHA256 of token stream (UTF-8)
     │   → 256-bit digest → ~77-digit integer N
     │
-    ▼ next_prime(N)        ← verse_to_prime.py stops here
-    │   prime P (77 digits)
+    ▼ next_prime(N)        ← mnemonic.py boundary
+    │   prime P (77 digits)  (verse_to_prime.py packages the artifact)
     │
     ▼ use digits of P as key schedule (ouroboros)
     │
@@ -214,6 +247,7 @@ verse (any length, any Unicode)
 
 | Tool | Purpose |
 |------|---------|
+| `tools/mnemonic/mnemonic.py` | Shared library: primality, verse-to-prime construction |
 | `tools/ucs-dec/ucs_dec_tool.py` | FDS encode / decode / frame / verify |
 | `tools/primes/primes.py` | Primality testing and prime generation |
 | `tools/constants/constants.py` | Named constant digit generation (IV sources) |
@@ -231,7 +265,8 @@ verse (any length, any Unicode)
 
 ## Compatibility
 
-Python 2.7+ / 3.x. No dependencies.
+Python 2.7+ / 3.x. No external dependencies.
+`prime_twist.py` and `verse_to_prime.py` import from `mnemonic.py` in the same directory.
 
 ## Licence
 
