@@ -128,6 +128,7 @@ Phase 4 — Release (~30 min)
 | Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
 | Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
 | Channel Camouflage Layer (CCL) | Informative profile; prime-twist test implementation complete; normative spec pending KDF selection |
+| Duress decoy forks | Multi-fork FDS artifacts with per-fork verse-derived keys; plausible deniability at hostile border crossings; see design note below |
 
 ### Mnemonic Share Wrapping and CCL — design status
 
@@ -249,6 +250,61 @@ The mod3 schedule clears the AES-128 reference on compressed binary
 payloads. This requires a WIDTH/3-specific CCL base schedule, tracked as
 an open question in `draft-darley-fds-ccl-prime-twist-00` §11.4 and gating
 normative WIDTH/3 CCL specification.
+
+---
+
+## Duress decoy forks — design note
+
+**Threat model:** an operator is compelled at a hostile border crossing to
+reveal the key to an FDS artifact. The adversary may recognise UCS-DEC
+encoding and demand decryption. The operator needs to be able to produce
+a plausible plaintext without revealing the real payload.
+
+**The pattern:** a single artifact contains multiple encrypted data forks,
+each wrapped under a distinct verse-derived key. Under duress the operator
+reveals the decoy verse, which decrypts to a convincing but non-sensitive
+payload. The real payload decrypts only under a verse the operator does not
+reveal. The artifact must be indistinguishable whether it contains one fork
+or N forks.
+
+**Key design constraints (unresolved):**
+
+- Fork count MUST NOT be detectable from the artifact exterior. If the
+  format leaks the number of forks, duress is immediately obvious.
+- The outer wrapper must be uniform regardless of fork count. The CCL
+  twist layer is a candidate outer wrapper: a CCL-twisted stream looks
+  like noise whether one or multiple forks are present inside.
+- Per-fork RSRC blocks (TOKENS, CRC32, TWIST-MAP) leak structural
+  information. Deniable forks require either a shared outer RSRC or
+  no RSRC at all at the outer layer, with per-fork metadata inside the
+  encrypted payload.
+- Decoy payloads must be operationally convincing. A trivial or empty
+  decoy defeats the purpose. The decoy should be a real artifact — a
+  poem, a key fragment, a field note — that makes sense in context.
+- The decoy verse must be plausibly memorable independently of the real
+  verse. "I have memorised two poems" is more deniable than a verse that
+  is obviously constructed for the purpose.
+- This relates to deniable encryption (Canetti et al., 1997) and hidden
+  volume designs (cf. VeraCrypt). Prior art should be reviewed before
+  normative specification.
+
+**Relationship to existing layers:**
+
+- FDS-FRAME framing and CRC32 verification operate on a single fork.
+  Multi-fork support requires a new outer framing layer or a defined
+  multi-fork container format.
+- CCL provides statistical camouflage but not confidentiality. Duress
+  decoy forks require actual encryption of fork content; CCL alone is
+  insufficient.
+- Mnemonic Share Wrapping (draft-darley-shard-bundle-01) addresses a
+  related but distinct problem: distributing key material across shares.
+  Duress forks address single-operator coercion resistance at the
+  artifact level.
+
+**Status:** design intent recorded. No implementation. Normative
+specification requires resolution of the outer framing design and the
+fork-count concealment mechanism. Tracked here pending a dedicated
+design sketch.
 
 ---
 
