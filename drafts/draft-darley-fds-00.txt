@@ -668,8 +668,8 @@ Table of Contents
 
 9.  Reference Implementation
 
-   A partial reference implementation of FDS encoding, payload decoding,
-   token-shape validation, and Print Profile generation is provided as
+   A reference implementation of FDS encoding, decoding, frame
+   verification, and Print Profile generation is provided as
    ucs_dec_tool.py [UCSDEC].  The implementation is MIT-licensed and
    compatible with Python 2.7 and Python 3.x, with no dependencies
    beyond the standard library.
@@ -677,17 +677,23 @@ Table of Contents
    The current implementation provides:
 
       o  FDS encoding (-e / --encode)
-      o  FDS decoding (-d / --decode)
-      o  Token shape validation (-v / --verify)
+
+      o  FDS decoding (-d / --decode), frame-aware: extracts WIDTH,
+         COL, and PAD from FDS-FRAME header when present
+
+      o  Frame verification (-v / --verify): checks value count,
+         CRC-32, and DESTROY semantics per Section 3.4
+
       o  FDS Print Profile generation (--frame)
 
-   Full FDS-FRAME parsing and frame-aware decoding (Section 8.1, steps 1
-   and 4) are not yet implemented in the reference implementation.  A
-   compliant frame parser is targeted for a future revision.
+   The implementation is fully frame-aware per Section 8.1.  The test
+   suite (tests/roundtrip/run_tests.sh) verifies the complete encode/
+   frame/decode/verify cycle: 8 tests, 0 failures.
 
-   The tool's decoding behaviour is intentionally permissive: non-
-   numeric tokens are silently ignored, allowing payload recovery from
-   Print Profile artifacts without requiring manual frame stripping.
+   The tool's decoding behaviour is intentionally permissive for non-
+   frame content: non-numeric tokens are silently ignored, allowing
+   payload recovery from Print Profile artifacts without requiring
+   manual frame stripping.
 
    Usage:
 
