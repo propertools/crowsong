@@ -31,6 +31,18 @@ This constraint is applied at every layer.
 
 ---
 
+## The stack
+
+```
+L5  Content    →  Meridian Protocol
+L4  Trust      →  SHARD-BUNDLE · MIRROR-ATTESTATION
+L3  Routing    →  Delay-Tolerant Networking (RFC 4838)
+L2  Encoding   →  Fox Decimal Script (FDS / UCS-DEC)
+L1  Physical   →  LoRa · Morse · Fax · RF · Kite-borne relay · Print · Human relay
+```
+
+---
+
 ## The drafts and how they fit together
 
 ```
@@ -38,9 +50,17 @@ draft-darley-meridian-protocol-01
   ↑ consumes
 draft-darley-crowsong-00
   ↑ composes
-draft-darley-fds-00           draft-darley-shard-bundle-00
-  ↑ implements                  ↑ implements
-tools/ucs-dec/ucs_dec_tool.py  [credmgr lineage, 2012]
+draft-darley-fds-00              draft-darley-shard-bundle-00
+  ↑ implements                     ↑ implements
+tools/ucs-dec/ucs_dec_tool.py    tools/mnemonic/
+  + tools/primes/                  verse_to_prime.py
+  + tools/constants/               prime_twist.py
+  + tools/sequences/
+  + tools/baseconv/
+
+draft-darley-fds-ccl-prime-twist-00   (pre-normative)
+  ↑ specifies
+tools/mnemonic/prime_twist.py
 ```
 
 ### Where to start
@@ -48,6 +68,7 @@ tools/ucs-dec/ucs_dec_tool.py  [credmgr lineage, 2012]
 - **Start with `draft-darley-fds-00`**
   If you want to implement something immediately.
   Self-contained. No dependencies. Reference implementation included.
+  Eight-test roundtrip suite passing.
 
 - **Read `draft-darley-crowsong-00`**
   For the architecture: how the layers compose and why.
@@ -60,6 +81,15 @@ tools/ucs-dec/ucs_dec_tool.py  [credmgr lineage, 2012]
   For the content layer: preserving addressability and continuity of
   web artifacts beyond origin failure.
 
+- **Read `draft-darley-fds-ccl-prime-twist-00`** *(pre-normative)*
+  For the Channel Camouflage Layer: prime-derived base-switching that
+  raises FDS payload entropy above the AES-128 ciphertext reference
+  without any cryptographic dependencies.
+
+- **Run `demo/ccl_demo.sh`**
+  Nine-step live demonstration of the full CCL pipeline.
+  One terminal window. No setup beyond the tools.
+
 ---
 
 ## The design in one sentence
@@ -69,23 +99,113 @@ and appropriate reference material.
 
 ---
 
+## The design principles
+
+Thirteen structural principles govern every design decision in the stack.
+The most important for new readers:
+
+**Principle 1:** Design for the failure case. The normal case takes care
+of itself.
+
+**Principle 3:** Human legibility is a hard requirement. Any layer that
+cannot be operated by a patient human with reference material has a single
+point of failure in software.
+
+**Principle 11:** SHOULD is a design smell. There is MUST, MUST NOT, and
+design work still to be done.
+
+**Principle 13:** Availability and integrity before confidentiality. The
+CIA triad is deliberately inverted. Confidentiality is a separable layer,
+never a precondition for system function.
+
+Full text: `docs/structural-principles.md`
+
+---
+
 ## The test vector
 
-The canonical test vector is a poem, encoded as Fox Decimal Script.
+The canonical test vector is a poem: *Second Law Blues* by T. Darley,
+attributed 桜稲荷 (Sakura Inari). It is encoded as an FDS flash paper
+artifact.
 
-COL/6 · WIDTH/5 · PAD/00000
-- 530 values
-- The first three decode to 桜稲荷
-- The encoding contains its own attribution
+```
+archive/flash-paper-SI-2084-FP-001-framed.txt   (framed)
+archive/flash-paper-SI-2084-FP-001-payload.txt  (payload)
+archive/second-law-blues.txt                    (source)
+```
+
+Properties:
+- 531 VALUES · CRC32:E8DC9BF3
+- WIDTH/5 · COL/6 · PAD/00000 · NFC
+- First three tokens: 26716 · 31282 · 33655 → 桜稲荷
+- The encoding carries its own attribution
 
 Suggested exercise:
 
-1. Decode it
-2. Verify the value count
-3. Re-encode it
-4. Compare output
+```bash
+# Decode
+cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
+    python tools/ucs-dec/ucs_dec_tool.py --decode
 
-Expected result: no difference.
+# Verify framed artifact
+python tools/ucs-dec/ucs_dec_tool.py -v \
+    < archive/flash-paper-SI-2084-FP-001-framed.txt
+# Expected: 531 OK, E8DC9BF3 OK
+
+# Run full test suite
+bash tests/roundtrip/run_tests.sh
+# Expected: 8 passed, 0 failed
+
+# Apply CCL3 — raises entropy from 4.78 to 8.37 bits/token
+python tools/mnemonic/prime_twist.py stack \
+    --verse-file verses.txt --ref CCL3 \
+    < archive/flash-paper-SI-2084-FP-001-payload.txt \
+    > /tmp/stacked.txt
+
+# Recover
+python tools/mnemonic/prime_twist.py unstack /tmp/stacked.txt | \
+    python tools/ucs-dec/ucs_dec_tool.py -d
+# Expected: the poem, intact
+```
+
+---
+
+## The CCL result
+
+Triple-pass prime-twist CCL on the canonical 534-token payload:
+
+| Stage | Entropy | Unique tokens |
+|-------|---------|---------------|
+| Original UCS-DEC | 4.78 bits/token | 53 |
+| CCL1 | 6.96 bits/token | 172 |
+| CCL2 | 7.82 bits/token | 282 |
+| CCL3 | **8.37 bits/token** | 375 |
+| AES-128 reference | ~7.9–8.0 bits/byte | — |
+
+Keys are verses. Verses live in memory. The prime exists nowhere until
+the moment of derivation. The twist-map travels in the artifact.
+CCL provides no cryptographic confidentiality — it raises the cost of
+passive attention.
+
+---
+
+## The local knowledge layer
+
+The Vesper system provides the long-horizon physical infrastructure:
+
+- **Vesper Archive** — archival paper, Mylar microclimate, silica gel,
+  Pelican case, 80cm depth, two sites minimum. Designed to carry the
+  signal forward 50+ years without electricity or software.
+  `docs/vesper-archive-protocol.md`
+
+- **Vesper Mirror** — local knowledge and package infrastructure.
+  Air-gapped for availability, not secrecy. ~360GB: packages, RFCs,
+  Wikipedia, Gutenberg, legal corpus, local AI inference (Ollama +
+  Meilisearch). Zero bytes leave the network.
+  `docs/vesper-mirror-architecture.md`
+
+Both are concrete instantiations of Structural Principle 13:
+availability and integrity before confidentiality. All the way down.
 
 ---
 
@@ -97,6 +217,8 @@ Expected result: no difference.
 2026  Fox Decimal Script   encoding for any channel
       Meridian Protocol    content continuity and authorship
       Crowsong suite       the stack formalised
+      CCL prime-twist      statistical camouflage, verse-derived keys
+      Vesper               physical archival and local mirror
 draft Aeolian Layer        delay-tolerant mesh over non-standard media
       (in progress)
 2084  Ghost Line           an unknown node, still transmitting
