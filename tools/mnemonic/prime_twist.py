@@ -35,10 +35,24 @@ Stacking (multiple passes):
 
 Usage:
     python prime_twist.py twist   --prime <P> [--width N] [--ref ID]
+                                  [--schedule standard|mod3]
     python prime_twist.py untwist <infile>
     python prime_twist.py stack   --primes P1,P2,... [--ref ID] [--med M]
+                                  [--schedule standard|mod3]
     python prime_twist.py stack   --verse-file <file> [--ref ID] [--med M]
+                                  [--schedule standard|mod3]
     python prime_twist.py unstack <infile>
+
+Schedules:
+    standard  Digit d -> base d (bases 2-9); falls back to base 10 when
+              base^width <= token_value. Default. Appropriate for WIDTH/5
+              UCS-DEC streams of natural language and Unicode text.
+
+    mod3      Digit d -> base (7 + d mod 3), always base 7, 8, or 9.
+              100% twist rate guaranteed -- no feasibility fallback.
+              Proposed for WIDTH/3 BINARY mode where bases 2-6 cannot
+              represent most byte values (base^3 <= 255).
+              See draft-darley-fds-ccl-prime-twist-00 SS.11.4.
 
 Input for twist/stack is read from stdin (bare UCS-DEC token stream).
 Output is a self-describing FDS Print Profile artifact or stack file.
@@ -175,21 +189,44 @@ def _from_base(s, base):
 
 # ── Key schedule ──────────────────────────────────────────────────────────────
 
+SCHEDULE_STANDARD = "standard"
+SCHEDULE_MOD3     = "mod3"
+SCHEDULES         = (SCHEDULE_STANDARD, SCHEDULE_MOD3)
+
+
 def _prime_digits(prime_str):
     """Return the digit sequence of the prime as a tuple of ints."""
     return tuple(int(d) for d in prime_str)
 
 
-def _scheduled_base(digit):
-    """Digit 0 or 1 -> base 10 (no twist). Digit 2-9 -> that base."""
+def _scheduled_base(digit, schedule=SCHEDULE_STANDARD):
+    """
+    Return the scheduled base for a prime digit under the given schedule.
+
+    standard: digit 0 or 1 -> base 10 (no twist); digit 2-9 -> that base.
+              Appropriate for WIDTH/5 UCS-DEC streams.
+
+    mod3:     digit d -> base (7 + d mod 3), always 7, 8, or 9.
+              Guarantees 100% twist rate at WIDTH/3 where bases 2-6
+              fail the feasibility check for most byte values.
+              See draft-darley-fds-ccl-prime-twist-00 Section 11.4.
+    """
+    if schedule == SCHEDULE_MOD3:
+        return 7 + (digit % 3)
     return 10 if digit <= 1 else digit
 
 
 def _effective_base(scheduled, token_value, width):
     """
     Return the base actually used for encoding.
-    Falls back to base 10 if scheduled base cannot represent
-    token_value within width digits.
+
+    Falls back to base 10 if the scheduled base cannot represent
+    token_value within width digits (base^width <= token_value).
+
+    Note: the mod3 schedule always selects base 7, 8, or 9. At WIDTH/3,
+    all three cover the full byte range (7^3=343, 8^3=512, 9^3=729, all
+    > 255), so the feasibility fallback never triggers under mod3 for
+    WIDTH/3 BINARY payloads.
     """
     if scheduled == 10:
         return 10
@@ -200,9 +237,15 @@ def _effective_base(scheduled, token_value, width):
 
 # ── Single-pass twist / untwist ───────────────────────────────────────────────
 
-def twist(token_stream, prime_str, width=5):
+def twist(token_stream, prime_str, width=5, schedule=SCHEDULE_STANDARD):
     """
     Apply prime-derived base-switching to a UCS-DEC token stream.
+
+    Args:
+        token_stream: whitespace-separated FDS token string
+        prime_str:    decimal string of the key prime
+        width:        FDS field width (default: 5)
+        schedule:     base schedule — SCHEDULE_STANDARD or SCHEDULE_MOD3
 
     Returns:
         (twisted_tokens, twist_map)
@@ -217,7 +260,7 @@ def twist(token_stream, prime_str, width=5):
 
     for i, tok in enumerate(tokens):
         n     = int(tok)
-        sched = _scheduled_base(p_digits[i % p_len])
+        sched = _scheduled_base(p_digits[i % p_len], schedule)
         base  = _effective_base(sched, n, width)
         twisted.append(_to_base(n, base, width))
         twist_map.append(base)
@@ -281,7 +324,8 @@ def _box_line(content):
 
 def make_artifact(twisted_tokens, twist_map, prime_str,
                   ref="", med="PAPER", width=5,
-                  stack_pass=None, stack_depth=None):
+                  stack_pass=None, stack_depth=None,
+                  schedule=SCHEDULE_STANDARD):
     """
     Wrap a twisted token stream in a self-describing FDS Print Profile
     artifact with an RSRC block carrying the twist-map and prime.
@@ -309,6 +353,7 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
         "  VERSION:    1",
         "  NOTE:       TEST IMPLEMENTATION — not normatively specified",
         "  PRIME:      {0}".format(prime_str),
+        "  SCHEDULE:   {0}".format(schedule),
         "  WIDTH:      {0}".format(width),
         "  TOKENS:     {0}".format(len(twisted_tokens)),
         "  TWISTED:    {0}".format(changed),
@@ -518,6 +563,11 @@ def build_parser():
     )
     p_twist.add_argument("--ref", default="", metavar="ID")
     p_twist.add_argument("--med", default="PAPER", metavar="MEDIUM")
+    p_twist.add_argument(
+        "--schedule", default=SCHEDULE_STANDARD,
+        choices=SCHEDULES, metavar="SCHEDULE",
+        help="base schedule: standard (default) or mod3 (WIDTH/3 BINARY)"
+    )
 
     # ── untwist ────────────────────────────────────────────────────────────
     p_untwist = subparsers.add_parser(
@@ -547,6 +597,11 @@ def build_parser():
     )
     p_stack.add_argument("--ref", default="CCL-STACK", metavar="ID")
     p_stack.add_argument("--med", default="PAPER", metavar="MEDIUM")
+    p_stack.add_argument(
+        "--schedule", default=SCHEDULE_STANDARD,
+        choices=SCHEDULES, metavar="SCHEDULE",
+        help="base schedule: standard (default) or mod3 (WIDTH/3 BINARY)"
+    )
 
     # ── unstack ────────────────────────────────────────────────────────────
     p_unstack = subparsers.add_parser(
@@ -571,16 +626,19 @@ def cmd_twist(args):
         print("Error: --prime must be a decimal integer", file=sys.stderr)
         return 1
 
-    twisted_tokens, twist_map = twist(data, args.prime, width=args.width)
+    twisted_tokens, twist_map = twist(
+        data, args.prime, width=args.width, schedule=args.schedule)
     changed = sum(1 for b in twist_map if b != 10)
-    print("Tokens: {0}, twisted: {1} ({2:.1f}%)".format(
+    print("Tokens: {0}, twisted: {1} ({2:.1f}%)  schedule: {3}".format(
         len(twist_map), changed,
-        100.0 * changed / len(twist_map) if twist_map else 0),
+        100.0 * changed / len(twist_map) if twist_map else 0,
+        args.schedule),
         file=sys.stderr)
 
     artifact = make_artifact(
         twisted_tokens, twist_map, args.prime,
-        ref=args.ref, med=args.med, width=args.width)
+        ref=args.ref, med=args.med, width=args.width,
+        schedule=args.schedule)
     _write_stdout(artifact)
     if not artifact.endswith("\n"):
         _write_stdout("\n")
@@ -662,7 +720,7 @@ def cmd_stack(args):
 
     for i, prime in enumerate(prime_list):
         twisted_tokens, twist_map = twist(
-            current_tokens, prime, width=args.width)
+            current_tokens, prime, width=args.width, schedule=args.schedule)
         changed = sum(1 for b in twist_map if b != 10)
         print("  Pass {0}/{1}: {2} tokens, {3} twisted ({4:.1f}%)".format(
             i + 1, depth, len(twist_map), changed,
@@ -675,7 +733,8 @@ def cmd_stack(args):
             med=args.med,
             width=args.width,
             stack_pass=i + 1,
-            stack_depth=depth)
+            stack_depth=depth,
+            schedule=args.schedule)
         artifacts.append(artifact)
         current_tokens = "  ".join(twisted_tokens)
 
