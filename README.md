@@ -171,11 +171,18 @@ cat archive/flash-paper-SI-2084-FP-001-payload.txt | \
 python tools/mnemonic/prime_twist.py unstack stacked.txt | \
   python tools/ucs-dec/ucs_dec_tool.py -d
 
+# For WIDTH/3 BINARY payloads, use the mod3 schedule
+# (guarantees 100% twist rate; bases 7/8/9 cover all byte values)
+cat binary-payload.w3 | \
+  python tools/mnemonic/prime_twist.py stack \
+    --verse-file verses.txt \
+    --schedule mod3 --width 3 --ref CCL3-BIN
+
 # Full capability demo (9 steps, one terminal window)
 bash demo/ccl_demo.sh
 ```
 
-What CCL3 achieves on the canonical 534-token payload:
+**WIDTH/5 — natural language and Unicode text:**
 
 | Stage | Entropy | Unique tokens |
 |-------|---------|---------------|
@@ -184,6 +191,21 @@ What CCL3 achieves on the canonical 534-token payload:
 | CCL2 | 7.82 bits/token | 282 |
 | CCL3 | **8.37 bits/token** | 375 |
 | AES-128 reference | ~7.9–8.0 bits/byte | — |
+
+**WIDTH/3 BINARY — compressed binary payloads, mod3 schedule:**
+
+| Pipeline | Entropy | Notes |
+|----------|---------|-------|
+| zlib → W3 → CCL3 (standard) | 7.76 bits/token | feasibility fallback limits twist rate |
+| zlib → W3 → CCL3 (mod3) | **8.07 bits/token** | 100% twist; exceeds AES-128 reference |
+| bz2  → W3 → CCL3 (mod3) | **7.96 bits/token** | at AES-128 threshold |
+| Theoretical ceiling (WIDTH/3) | 9.97 bits/token | log₂(1000) — hard vocabulary limit |
+
+The theoretical ceiling of 9.97 bits/token at WIDTH/3 is a consequence of
+the token vocabulary being bounded at 1000 values (000–999). CCL does not
+approach this ceiling on real payloads — compressed byte streams use only
+256 distinct values — but there is significant headroom above the AES-128
+reference that further research may exploit.
 
 CCL provides no cryptographic confidentiality. It reduces salience.
 The keys are verses. The verses live in memory.
