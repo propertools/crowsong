@@ -52,7 +52,7 @@ Schedules:
               100% twist rate guaranteed -- no feasibility fallback.
               Proposed for WIDTH/3 BINARY mode where bases 2-6 cannot
               represent most byte values (base^3 <= 255).
-              See draft-darley-fds-ccl-prime-twist-00 SS.11.4.
+              See draft-darley-fds-ccl-prime-twist-00 Section 11.4.
 
 Input for twist/stack is read from stdin (bare UCS-DEC token stream).
 Output is a self-describing FDS Print Profile artifact or stack file.
@@ -88,10 +88,12 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import binascii
-import hashlib
 import sys
 import time
-import unicodedata
+
+# Shared construction library — primality testing and verse-to-prime derivation.
+# Single canonical implementation shared with verse_to_prime.py.
+from mnemonic import next_prime, derive as _mnemonic_derive  # noqa: E402
 
 PY2 = (sys.version_info[0] == 2)
 
@@ -113,57 +115,14 @@ STACK_PASS   = "=== CCL STACK PASS {n}/{depth} ==="
 STACK_END    = "=== CCL STACK END {d} REF/{ref} ==="
 
 
-# ── Miller-Rabin (for --verse-file prime derivation) ─────────────────────────
-
-_MR_WITNESSES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
-
-
-def _is_prime(n):
-    if n < 2:
-        return False
-    for p in _MR_WITNESSES:
-        if n == p:
-            return True
-        if n % p == 0:
-            return False
-    d, r = n - 1, 0
-    while d % 2 == 0:
-        d //= 2
-        r += 1
-    for a in _MR_WITNESSES:
-        if a >= n:
-            continue
-        x = pow(a, d, n)
-        if x == 1 or x == n - 1:
-            continue
-        composite = True
-        for _ in range(r - 1):
-            x = pow(x, 2, n)
-            if x == n - 1:
-                composite = False
-                break
-        if composite:
-            return False
-    return True
-
-
-def _next_prime(n):
-    if n <= 2:
-        return 2
-    n = n | 1
-    while not _is_prime(n):
-        n += 2
-    return n
-
+# ── Verse-to-prime (delegated to mnemonic library) ───────────────────────────
 
 def _verse_to_prime(verse):
-    """Derive a prime from a verse via NFC -> UCS-DEC -> SHA256 -> next_prime."""
-    normalised   = unicodedata.normalize("NFC", verse.strip())
-    token_stream = " ".join(
-        "{0:05d}".format(ord(ch)) for ch in normalised)
-    digest = hashlib.sha256(token_stream.encode("utf-8")).hexdigest()
-    N      = int(digest, 16)
-    return _next_prime(N)
+    """
+    Derive a prime from a verse via NFC -> UCS-DEC -> SHA256 -> next_prime.
+    Delegates to mnemonic.derive() — the single canonical implementation.
+    """
+    return _mnemonic_derive(verse.strip())["P"]
 
 
 # ── Base conversion ───────────────────────────────────────────────────────────
@@ -427,10 +386,11 @@ def parse_artifact(content):
                     and not stripped.startswith("|") \
                     and "RESERVED" not in stripped \
                     and "VALUES" not in stripped:
-                pass
+                pass  # structural line (box border, label etc.) — intentionally ignored
 
     return {
         "prime_str":     fields.get("PRIME", ""),
+        "schedule":      fields.get("SCHEDULE", SCHEDULE_STANDARD),
         "width":         int(fields.get("WIDTH", "5")),
         "twist_map_enc": fields.get("TWIST-MAP", ""),
         "twisted_tokens": twisted_lines,
@@ -685,7 +645,7 @@ def cmd_stack(args):
     else:
         try:
             with open(args.verse_file, encoding="utf-8") as f:
-                verses = [l.rstrip("\n") for l in f if l.strip()]
+                verses = [l.rstrip("\r\n") for l in f if l.strip()]
         except IOError as err:
             print("Error: {0}".format(err), file=sys.stderr)
             return 1
