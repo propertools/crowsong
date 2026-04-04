@@ -32,7 +32,7 @@ No expansion. New functionality only where the system is incomplete without it.
 | 2 | Frame-aware FDS-FRAME parser | ✅ done (`-00`) | Primary gap between spec and tool; §8.1 steps 1 and 4 |
 | 3 | Frame-aware `--decode` | ✅ done (`-00`) | Uses extracted WIDTH/COL/PAD, not hardcoded defaults |
 | 4 | `--verify` enforcement | ✅ done (`-00`) | Count + CRC32 + DESTROY semantics per §3.4 |
-| 5 | WIDTH/3 BINARY mode | ⬜ todo | Implement alongside spec section; Class D channel requirement |
+| 5 | WIDTH/3 BINARY mode | ⬜ todo | Implement alongside spec section; Class D channel requirement; CCL schedule for WIDTH/3 must be resolved first (draft-darley-fds-ccl-prime-twist-00 §11.4) |
 
 **CLI decision:** resolved. Frame awareness is automatic in `--decode` and
 `--verify`; no `--strict` flag needed.
@@ -45,7 +45,7 @@ round-trips cleanly; tested in suite.
 | # | Item | Status | Rationale |
 |---|------|--------|-----------|
 | 6 | Resource fork (minimal) | ⬜ todo | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
-| 7 | WIDTH/3 BINARY mode | ⬜ todo | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes |
+| 7 | WIDTH/3 BINARY mode | ⬜ todo | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes; CCL base schedule requires separate resolution (see CCL draft §11.4) |
 | 8 | Structural Principles: Principle 11 | ✅ done (`-00`) | SHOULD as design smell; optionality via composable components |
 | 9 | Structural Principles: Principle 12 | ✅ done (`-00`) | Timestamps as claims; discardable outer layer |
 | 10 | Structural Principles: Principle 13 | ✅ done (`-00`) | Availability and integrity before confidentiality |
@@ -210,7 +210,7 @@ Refactor into reference implementation pending normative spec.
 | `docs/sequences/` | ✅ done | Cached OEIS sequences, SHA256-verified |
 | `docs/mnemonic-shamir-sketch.md` | ✅ done | Pre-normative design sketch; open questions tracked |
 
-**CCL3 entropy results on canonical 534-token payload:**
+**CCL3 entropy results on canonical 534-token payload (WIDTH/5):**
 
 | Stage | Entropy | Unique tokens |
 |-------|---------|---------------|
@@ -225,6 +225,30 @@ indistinguishable from professional cryptographic output to heuristic
 analysis. Five-digit decimal tokens are injected directly into plausible
 side-channel containers (telemetry CSV, log files, cross-reference lists)
 without modification.
+
+**Compression interaction (WIDTH/5):** Prior compression via base64 yields
+marginal gains (+0.13 to +0.19 bits/token) due to the base64 alphabet ceiling
+at log₂(65) ≈ 6.02 bits/token. For natural language, skip compression. For
+binary payloads, use the FDS B64 pipeline. See CCL draft §8.3.
+
+**WIDTH/3 BINARY + CCL — open question (gates implementation):**
+
+The standard CCL base schedule (bases 2–9) performs poorly at WIDTH/3
+because scheduled bases 2–6 fail the feasibility check for most byte values
+(base^3 ≤ 255), collapsing the effective twist rate to ~50% or less.
+
+Empirical results with proposed `mod3` schedule (digit mod 3 → base 7/8/9,
+100% twist guaranteed):
+
+| Pipeline | H(CCL3) standard | H(CCL3) mod3 |
+|----------|-----------------|--------------|
+| zlib → W3/BIN → CCL3 | 7.7572 | **8.0727** |
+| bz2  → W3/BIN → CCL3 | 7.7167 | **7.9594** |
+
+The mod3 schedule clears the AES-128 reference on compressed binary
+payloads. This requires a WIDTH/3-specific CCL base schedule, tracked as
+an open question in `draft-darley-fds-ccl-prime-twist-00` §11.4 and gating
+normative WIDTH/3 CCL specification.
 
 ---
 
