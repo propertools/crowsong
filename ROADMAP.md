@@ -47,13 +47,14 @@ round-trips cleanly; tested in suite.
 | 6 | Resource fork (minimal) | ⬜ todo | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
 | 7 | WIDTH/3 BINARY mode | ⬜ todo | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes |
 | 8 | Structural Principles: Principle 11 | ✅ done (`-00`) | SHOULD as design smell; optionality via composable components |
-| 9 | Housekeeping pass | ⬜ todo | Cross-references, implementation section, transport matrix |
+| 9 | Structural Principles: Principle 12 | ✅ done (`-00`) | Timestamps as claims; discardable outer layer |
+| 10 | Housekeeping pass | ⬜ todo | Cross-references, implementation section, transport matrix |
 
 ### Cross-document
 
 | # | Item | Status | Target draft |
 |---|------|--------|-------------|
-| 10 | Human coordination layer | ⬜ todo | `draft-darley-crowsong-01` |
+| 11 | Human coordination layer | ⬜ todo | `draft-darley-crowsong-01` |
 
 Covers: talking stick model, priority signalling (EMERGENCY / URGENT / ROUTINE),
 distributed moderation, operator attestation.
@@ -78,7 +79,7 @@ Status: informative section, 1–2 pages.
 - [x] `--verify` enforces count + CRC32 + DESTROY semantics
 - [x] Test suite expanded and passing
 - [x] Canonical artifacts verified unchanged post-NFC
-- [x] Structural Principles updated (Principle 11)
+- [x] Structural Principles updated (Principles 11 and 12)
 - [ ] Resource fork section complete
 - [ ] WIDTH/3 BINARY section and implementation complete
 - [ ] Human coordination section added to Crowsong draft
@@ -124,6 +125,61 @@ Phase 4 — Release (~30 min)
 | Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery |
 | Story infrastructure | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
 | Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
+| Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
+| Channel Camouflage Layer (CCL) | Informative profile; representation schedule to reduce payload salience in degraded channels; |
+
+### Mnemonic Share Wrapping and CCL — design status
+Working consensus: two mechanisms, strictly separated.
+
+**Mnemonic Share Wrapping** (normative, `draft-darley-shard-bundle-01`)
+Anchors Shamir share recovery to human-memorable material. The mnemonic
+unlocks the share; it does not become the share. Shamir security guarantees
+remain intact.
+
+```
+Secret S → Shamir split → share sᵢ
+                               ↓
+                    mnemonic input (verse, NFC-normalised)
+                               ↓
+                    Kᵢ = KDF(mnemonic, context=share_id)
+                               ↓
+                    wrapped_sᵢ = sᵢ XOR Kᵢ
+```
+
+Coercion surface: *which verse, which share packet, which context.* Not the
+key. The reconstruction key is never stored or transmitted directly.
+
+**Channel Camouflage Layer** (informative, CCL)
+**CCL provides no confidentiality or integrity guarantees and MUST NOT be relied upon for cryptographic protection.**
+Reduces the visual and statistical salience of FDS payloads without
+providing cryptographic confidentiality. Reversible deterministic transforms
+driven by a named public IV. Output remains valid UCS-DEC.
+
+Transforms MUST preserve transcription stability; increased apparent entropy MUST NOT significantly increase operator error rates.
+
+```
+IV: PI · OFFSET/1000 · BASESET/10,11,12 (public, deterministic)
+```
+
+Layer separation is strict and MUST be maintained in both spec and
+implementation:
+
+| Layer | Responsibility |
+|-------|---------------|
+| Shamir | Threshold security |
+| Mnemonic wrapping | Human recovery |
+| CCL | Visual/statistical camouflage |
+| FDS | Transport encoding |
+
+No layer depends on another for its correctness or security guarantees.
+
+**Key open question (gates everything else):** KDF selection.
+PBKDF2 is the leading candidate due to portability and Python 2.7 compatibility.
+Must be resolved before mnemonic wrapping can be specified normatively.
+
+**One-line summary:**
+*Secrets are reconstructed, not stored. Memory carries meaning.
+Math provides coordination. Camouflage keeps the signal from being noticed.*
 
 ---
 
@@ -170,6 +226,35 @@ Two pipelines. Two fax machines. Two pairs of sneakers. No intermediate manual s
 * Resource fork spec (`fds-01`)
 * Physical page layout tooling (new)
 * Image-to-grid decoder (new)
+
+### End-to-end demo scenario
+
+**Target:** `tools/demo/`
+
+Two operators. Two terminals. A fax machine at each end.
+
+Operator A fetches a web artifact, packages it into data and resource forks,
+encodes, and transmits. Operator B receives, decodes, unpacks, and renders
+in a browser — offline, from received pages.
+
+The firmware variant: replace the web artifact with a binary patch. Receiver
+verifies CRC32 before flashing. `IF COUNT FAILS: DESTROY IMMEDIATELY` is not
+decorative.
+
+The channel between them could be a fax line in East Africa.
+It could be TCP/IP over a piece of barbed wire.
+It could be a human courier with a printed stack of flash paper.
+It could be someone blinking Morse in a meeting.
+
+The stack does not care. The stack was designed for this.
+
+**Dependencies:**
+
+* `tools/package.py` — fetch, split data/resource fork, rewrite paths (new)
+* `tools/unpackage.py` — reconstruct and render from forks (new)
+* WIDTH/3 BINARY (`fds-01`)
+* Resource fork spec (`fds-01`)
+* FDS Fax Page Profile (far horizon, optional for initial demo)
 
 ---
 
