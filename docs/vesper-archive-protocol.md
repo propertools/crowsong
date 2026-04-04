@@ -284,10 +284,12 @@ knowledge to understand. Adapt as appropriate.
 
 **VESPER ARCHIVE**
 
-*Created by: [NAME]*
+*Created by: [AUTHOR NAME]*
+*Organisation: [ORGANISATION]
 *Purpose: [PURPOSE]*
-*Date of creation: [DATE]*
-*Date of burial: [DATE]*
+*Location: [LOCATION]*
+*Date of creation: [CREATION DATE]*
+*Date of burial: [BURIAL DATE]*
 
 This container holds documents created between approximately [YEAR] and [YEAR].
 
@@ -362,6 +364,6 @@ Signal discipline. All the way down.
 
 ---
 
-*Vesper Archive Protocol v1.0*
-*Proper Tools SRL — propertools.be*
-*TLP:CLEAR*
+- *Vesper Archive Protocol v1.0*
+- *Proper Tools SRL — propertools.be*
+- *TLP:CLEAR*
