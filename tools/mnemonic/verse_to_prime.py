@@ -61,17 +61,16 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import binascii
+import io
 import sys
 import time
 
 PY2 = (sys.version_info[0] == 2)
 
 if PY2:
-    text_type = unicode   # noqa: F821
-    to_chr    = unichr    # noqa: F821
+    to_chr = unichr   # noqa: F821
 else:
-    text_type = str
-    to_chr    = chr
+    to_chr = chr
 
 # Shared construction library — primality testing and verse-to-prime derivation.
 # This is the single canonical implementation; prime_twist.py also imports from here.
@@ -167,7 +166,7 @@ def make_artifact(result, ref="", med="PAPER", width=5):
     header_lines.append(_box_line(enc_line))
     header_lines.append(_box_line(
         "MED: {0}".format(med)))
-    header_lines.append(_box_line("DESTROY AFTER USE"))
+    header_lines.append(_box_line("DESTROY AFTER READING"))
     header_lines.append(_box_rule())
 
     # Footer box
@@ -315,7 +314,7 @@ def cmd_derive(args):
 
 def cmd_verify(args):
     try:
-        with open(args.infile, encoding="utf-8") as f:
+        with io.open(args.infile, "r", encoding="utf-8") as f:
             content = f.read()
     except IOError as err:
         print("Error: {0}".format(err), file=sys.stderr)
@@ -353,11 +352,13 @@ def cmd_verify(args):
     digits_declared = fields.get("DIGITS", "").strip()
     type_declared   = fields.get("TYPE", "").strip()
     ver_declared    = fields.get("VERSION", "").strip()
-    digest_declared = fields.get("DIGEST", "").replace("SHA256:", "").strip()
+    digest_hex      = fields.get("DIGEST", "").replace("SHA256:", "").strip()
 
     print("File:      {0}".format(args.infile))
     print("Type:      {0}".format(type_declared or "?"))
     print("Method:    {0}".format(fields.get("METHOD", "?")))
+    if digest_hex:
+        print("Digest:    present (not verifiable without source verse)")
     print()
 
     ok = True
@@ -398,14 +399,18 @@ def cmd_verify(args):
         if not digits_ok:
             ok = False
 
-    # Verify N is consistent: N must be <= P (P = next_prime(N), so P >= N)
+    # Verify construction consistency: next_prime(N) must equal P.
+    # This is a strong check — it verifies the construction without
+    # needing the original verse.
     if P is not None and N_declared:
         try:
             N = int(N_declared)
-            n_ok = (N <= P)
-            print("N <= P:    {0}... — {1}".format(
-                str(N)[:20],
-                "OK" if n_ok else "FAIL (N > P)"))
+            derived_p = next_prime(N)
+            n_ok = (derived_p == P)
+            print("next_prime(N): {0}... — {1}".format(
+                str(derived_p)[:20],
+                "OK — P = next_prime(N)" if n_ok
+                else "FAIL — declared P does not match next_prime(N)"))
             if not n_ok:
                 ok = False
         except ValueError:
