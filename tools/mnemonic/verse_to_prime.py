@@ -3,10 +3,10 @@
 """
 verse_to_prime.py — mnemonic prime derivation
 
-Derives a prime number from a verse or other memorable text,
-using UCS-DEC encoding as the intermediate representation.
+Derives a deterministic prime from a verse or other memorable text,
+using UCS-DEC as the canonical intermediate representation.
 
-The construction:
+Construction:
 
     verse (any Unicode text)
       -> NFC normalise
@@ -16,14 +16,33 @@ The construction:
       -> next_prime(N)
       -> prime P
 
-Output is a self-describing FDS Print Profile artifact whose
-payload is the UCS-DEC encoding of the derived prime.
+Output is a self-describing FDS Print Profile artifact whose payload
+is the UCS-DEC encoding of the derived prime.
+
+This tool generates reproducibility artifacts. The derived prime P
+and the intermediate value N are both stored in the artifact RSRC
+block. This enables verification of the construction trace but means
+the artifact does not conceal P. Confidentiality and threshold
+security are provided by separate layers; see draft-darley-shard-bundle-01.
 
 Usage:
     python verse_to_prime.py derive
     python verse_to_prime.py derive --show-steps
     python verse_to_prime.py derive --ref SHARE-1 --med PAPER
     python verse_to_prime.py verify <infile>
+
+verify checks artifact integrity and internal consistency:
+    - RSRC block present and TYPE/VERSION correct
+    - declared P is prime
+    - payload encodes declared P
+    - declared N is consistent with declared P (N <= P)
+    - declared DIGITS matches len(P)
+    - CRC32 matches payload
+
+verify does NOT check derivation correctness. Without the original
+verse, it cannot verify that P was derived from that verse. To verify
+the full derivation, re-run derive on the original verse and compare
+the declared DIGEST fields.
 
 Input is read from stdin. The verse may be any length.
 
@@ -57,12 +76,19 @@ else:
     to_chr    = chr
 
 # ── Miller-Rabin ──────────────────────────────────────────────────────────────
-# Deterministic below 3.3e24; probabilistic with negligible error above that.
-# For 77-digit inputs (SHA256 output range) we use 64 rounds — the probability
-# of a composite passing is at most 4^-64, which is negligible.
+# The implementation always uses the fixed witness set WITNESSES_SMALL.
+#
+# This is deterministic (no false positives) for n < 3,317,044,064,679,887,385,961,981
+# (~3.3e24). For larger n — including all SHA256-derived inputs (~77 digits) —
+# the fixed witness set is a heuristic: no counterexample is known for these
+# witnesses, and the construction gives no advantage to an adversary trying to
+# produce a composite that passes, but formal determinism is not guaranteed
+# above the proven bound.
+#
+# For the use case of this tool (next_prime on a SHA256 digest), this is
+# sufficient. The inputs are not adversarially chosen.
 
 WITNESSES_SMALL = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
-ROUNDS_LARGE    = 64
 
 
 def _miller_rabin(n, witnesses):
@@ -92,9 +118,12 @@ def is_prime(n):
     """
     Return True if n is (very probably) prime.
 
-    Deterministic for n < 3,317,044,064,679,887,385,961,981.
-    For larger n (including all SHA256-derived inputs), uses 64
-    Miller-Rabin rounds — error probability at most 4^-64.
+    Uses the fixed witness set WITNESSES_SMALL with Miller-Rabin.
+    Deterministic (no false positives) for n < ~3.3e24.
+    For larger n, including all SHA256-derived inputs (~77 digits),
+    this is a well-tested heuristic with no known counterexample
+    for this witness set. No probabilistic round count is used;
+    the implementation does not vary with input size.
     """
     if n < 2:
         return False
@@ -103,8 +132,6 @@ def is_prime(n):
             return True
         if n % p == 0:
             return False
-    # Use deterministic witness set for small n, random-equivalent
-    # fixed witnesses for large n
     return _miller_rabin(n, WITNESSES_SMALL)
 
 
@@ -374,7 +401,7 @@ def build_parser():
 
 
 def cmd_derive(args):
-    verse = _read_stdin().rstrip("\n")
+    verse = _read_stdin().rstrip("\r\n")
     if not verse:
         print("Error: empty input", file=sys.stderr)
         return 1
@@ -442,19 +469,31 @@ def cmd_verify(args):
 
     payload = "\n".join(payload_lines)
 
-    # Re-derive and check
-    P_declared = fields.get("P", "").strip()
-    N_declared = fields.get("N", "").strip()
+    P_declared      = fields.get("P", "").strip()
+    N_declared      = fields.get("N", "").strip()
+    digits_declared = fields.get("DIGITS", "").strip()
+    type_declared   = fields.get("TYPE", "").strip()
+    ver_declared    = fields.get("VERSION", "").strip()
     digest_declared = fields.get("DIGEST", "").replace("SHA256:", "").strip()
 
     print("File:      {0}".format(args.infile))
-    print("Type:      {0}".format(fields.get("TYPE", "?")))
+    print("Type:      {0}".format(type_declared or "?"))
     print("Method:    {0}".format(fields.get("METHOD", "?")))
     print()
 
     ok = True
 
+    # Check TYPE and VERSION
+    if type_declared != "mnemonic-prime":
+        print("Type:      FAIL (expected mnemonic-prime, got {0!r})".format(
+            type_declared))
+        ok = False
+    if ver_declared != "1":
+        print("Version:   FAIL (expected 1, got {0!r})".format(ver_declared))
+        ok = False
+
     # Verify P is prime
+    P = None
     if P_declared:
         try:
             P = int(P_declared)
@@ -471,6 +510,29 @@ def cmd_verify(args):
         print("Prime P:   MISSING")
         ok = False
 
+    # Verify declared DIGITS matches len(P)
+    if P is not None and digits_declared:
+        digits_ok = (digits_declared == str(len(str(P))))
+        print("Digits:    {0} — {1}".format(
+            digits_declared,
+            "OK" if digits_ok else "FAIL (actual: {0})".format(len(str(P)))))
+        if not digits_ok:
+            ok = False
+
+    # Verify N is consistent: N must be <= P (P = next_prime(N), so P >= N)
+    if P is not None and N_declared:
+        try:
+            N = int(N_declared)
+            n_ok = (N <= P)
+            print("N <= P:    {0}... — {1}".format(
+                str(N)[:20],
+                "OK" if n_ok else "FAIL (N > P)"))
+            if not n_ok:
+                ok = False
+        except ValueError:
+            print("N:         FAIL (unparseable)")
+            ok = False
+
     # Verify payload encodes the declared prime
     if P_declared and payload:
         payload_decoded = ucs_dec_decode(payload)
@@ -485,7 +547,6 @@ def cmd_verify(args):
     if payload:
         crc_actual = format(
             binascii.crc32(payload.encode("utf-8")) & 0xFFFFFFFF, "08X")
-        # Find declared CRC from footer
         crc_declared = None
         for line in content.splitlines():
             if "CRC32:" in line and "VALUES" in line:
@@ -500,6 +561,10 @@ def cmd_verify(args):
             if not crc_ok:
                 ok = False
 
+    print()
+    print("NOTE: verify checks artifact integrity only.")
+    print("      To verify derivation, re-run derive on the original")
+    print("      verse and compare the DIGEST fields.")
     print()
     print("Verification: {0}".format("PASS" if ok else "FAIL"))
     return 0 if ok else 1
