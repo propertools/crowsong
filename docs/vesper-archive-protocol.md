@@ -2,11 +2,11 @@
 
 *"Carry the signal forward."*
 
-**Version:** 1.0
-**Classification:** TLP:WHITE — this document may be shared freely
-**Author:** Vernon Olin Darley III / Proper Tools SRL
-**Created:** 2026-03-16
-**Status:** Active
+- **Version:** 1.0
+- **Classification:** TLP:WHITE — this document may be shared freely
+- **Author:** Vernon Olin Darley III / Proper Tools SRL
+- **Created:** 2026-03-16
+- **Status:** Active
 
 ---
 
@@ -56,8 +56,6 @@ These items go in every capsule, without exception.
 - **This document** — the archive protocol itself
 - **A context page** — what this is, who created it, when, why; written
   for a reader with no prior knowledge (see template below)
-- **Field Notes** — the canonical body of written work; prioritise essays
-  with long half-lives over time-sensitive material
 - **The structural principles** — `docs/structural-principles.md`;
   applicable beyond any specific project
 - **The Y2038 summary** — a plain-language explanation of the Year 2038
@@ -74,10 +72,7 @@ These items go in every capsule, without exception.
 
 ### Tier 3 — Personal (discretionary)
 
-- Letters — to future readers, to no one in particular
-- Mathematical notes — MM₇, the Catalan-Mersenne sequence, whatever
-  feels worth carrying forward
-- A playlist — not the music, the titles; signal across time
+- As-needed
 
 ### Exclude
 
@@ -185,8 +180,6 @@ constituting the entire secondary capsule. Contains:
 - The context page
 - A one-page Y2038 summary
 - A one-page structural principles summary
-- Three Field Notes (the most durable essays)
-- A brief biography of the author
 
 If the main bundle is damaged, the Rosetta bundle may survive. If the
 Rosetta bundle is all that survives, it is still meaningful.
@@ -291,30 +284,12 @@ knowledge to understand. Adapt as appropriate.
 
 **VESPER ARCHIVE**
 
-*Created by: Vernon Olin Darley III*
-*Proper Tools SRL, Brussels, Belgium*
+*Created by: [NAME]*
+*Purpose: [PURPOSE]*
 *Date of creation: [DATE]*
 *Date of burial: [DATE]*
 
-This container holds documents created between approximately 2020 and [YEAR].
-
-The documents include essays on infrastructure, technology, and time;
-technical documentation for a home network built in Brussels; notes on a
-computer systems vulnerability called the Year 2038 problem; and personal
-writing.
-
-These documents are intended to be read directly, without tools, electricity,
-or special knowledge. They are printed on archival paper with permanent ink.
-
-If you are reading this many years after it was buried: the Year 2038 problem
-concerns a failure mode in computer systems that represent time as a 32-bit
-integer. Many such systems will malfunction on or after 19 January 2038. If
-that date is still in your future, this information may be useful.
-
-The author was a network security consultant and resilience engineer working
-in Brussels in the early twenty-first century.
-a dog named Sombra, and a particular affection for the music of Frightened
-Rabbit and Neutral Milk Hotel.
+This container holds documents created between approximately [YEAR] and [YEAR].
 
 *"It's not darkest before the dawn. That's just something that people say."*
 
