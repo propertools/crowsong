@@ -127,7 +127,7 @@ Phase 4 — Release (~30 min)
 | Story infrastructure | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
 | Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
 | Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
-| Channel Camouflage Layer (CCL) | Informative profile; representation schedule to reduce payload salience in degraded channels |
+| Channel Camouflage Layer (CCL) | Informative profile; prime-twist test implementation complete; normative spec pending KDF selection |
 
 ### Mnemonic Share Wrapping and CCL — design status
 
@@ -190,6 +190,41 @@ Must be resolved before mnemonic wrapping can be specified normatively.
 **One-line summary:**
 *Secrets are reconstructed, not stored. Memory carries meaning.
 Math provides coordination. Camouflage keeps the signal from being noticed.*
+
+### Mnemonic and CCL toolchain — implementation status
+
+Pre-normative test implementations exist and are verified.
+Marked `TEST IMPLEMENTATION — not normatively specified` in all artifacts.
+Refactor into reference implementation pending normative spec.
+
+| Tool | Status | Notes |
+|------|--------|-------|
+| `tools/primes/primes.py` | ✅ done | Deterministic Miller-Rabin; `is-prime`, `next-prime`, `first`, `range` |
+| `tools/constants/constants.py` | ✅ done | 8 named constants; `list`, `digits`, `show`, `generate`, `verify` |
+| `tools/sequences/sequences.py` | ✅ done | 15 OEIS sequences; `list`, `show`, `terms`, `sync`, `verify` |
+| `tools/baseconv/baseconv.py` | ✅ done | Bases 2–36; CLI and library |
+| `tools/mnemonic/verse_to_prime.py` | ✅ done | verse → NFC → UCS-DEC → SHA256 → next\_prime → FDS artifact |
+| `tools/mnemonic/prime_twist.py` | ✅ done | CCL prime-twist; `twist`, `untwist`, `stack` (max 10), `unstack` |
+| `demo/ccl_demo.sh` | ✅ done | 9-step live demo; canonical payload; CCL3 achieves 8.37 bits/token |
+| `docs/constants/` | ✅ done | Pre-generated 10,000-digit files for all 8 constants |
+| `docs/sequences/` | ✅ done | Cached OEIS sequences, SHA256-verified |
+| `docs/mnemonic-shamir-sketch.md` | ✅ done | Pre-normative design sketch; open questions tracked |
+
+**CCL3 entropy results on canonical 534-token payload:**
+
+| Stage | Entropy | Unique tokens |
+|-------|---------|---------------|
+| Original UCS-DEC | 4.78 bits/token | 53 |
+| CCL1 | 6.96 bits/token | 172 |
+| CCL2 | 7.82 bits/token | 282 |
+| CCL3 | **8.37 bits/token** | 375 |
+| AES-128 reference | ~7.9–8.0 bits/byte | — |
+
+CCL3 exceeds the AES-128 reference. Output is statistically
+indistinguishable from professional cryptographic output to heuristic
+analysis. Five-digit decimal tokens are injected directly into plausible
+side-channel containers (telemetry CSV, log files, cross-reference lists)
+without modification.
 
 ---
 
@@ -322,12 +357,19 @@ The channel between them could be a fax line in East Africa.
 It could be TCP/IP over a piece of barbed wire.
 It could be a human courier with a printed stack of flash paper.
 It could be someone blinking Morse in a meeting.
+It could be a CSV in a routine status email.
+It could be sensor telemetry auto-archived and never examined.
 
 The stack does not care. The stack was designed for this.
 
 **Dependencies:** `tools/package.py`, `tools/unpackage.py`, WIDTH/3 BINARY
 (`fds-01`), resource fork spec (`fds-01`), FDS Fax Page Profile (optional
 for initial demo).
+
+**CCL demo (`demo/ccl_demo.sh`):** ✅ done. Nine-step live demonstration
+of the full CCL pipeline. Canonical 534-token payload. Triple-pass stack.
+Entropy ladder from 4.78 to 8.37 bits/token. Steganographic injection into
+network telemetry CSV. Full round-trip recovery. Runs in one terminal window.
 
 ---
 
