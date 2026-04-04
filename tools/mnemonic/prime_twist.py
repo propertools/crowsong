@@ -31,7 +31,8 @@ Stacking (multiple passes):
     CCL provides no cryptographic confidentiality or integrity protection.
     Stacking increases statistical salience reduction but does not
     change the fundamental security properties of CCL.
-    See draft-darley-shard-bundle-01 for normative security properties.
+    Security properties for mnemonic share wrapping are specified
+    separately in draft-darley-shard-bundle-01.
 
 Usage:
     python prime_twist.py twist   --prime <P> [--width N] [--ref ID]
@@ -88,21 +89,20 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import binascii
+import io
 import sys
 import time
 
 # Shared construction library — primality testing and verse-to-prime derivation.
 # Single canonical implementation shared with verse_to_prime.py.
-from mnemonic import next_prime, derive as _mnemonic_derive  # noqa: E402
+from mnemonic import derive as _mnemonic_derive  # noqa: E402
 
 PY2 = (sys.version_info[0] == 2)
 
 if PY2:
-    text_type = unicode   # noqa: F821
-    to_chr    = unichr    # noqa: F821
+    to_chr = unichr   # noqa: F821
 else:
-    text_type = str
-    to_chr    = chr
+    to_chr = chr
 
 _DIGIT_CHARS = "0123456789"
 BOX_INNER    = 41
@@ -121,8 +121,10 @@ def _verse_to_prime(verse):
     """
     Derive a prime from a verse via NFC -> UCS-DEC -> SHA256 -> next_prime.
     Delegates to mnemonic.derive() — the single canonical implementation.
+    Strip policy (leading/trailing whitespace) is applied in mnemonic.derive(),
+    not here.
     """
-    return _mnemonic_derive(verse.strip())["P"]
+    return _mnemonic_derive(verse)["P"]
 
 
 # ── Base conversion ───────────────────────────────────────────────────────────
@@ -607,7 +609,7 @@ def cmd_twist(args):
 
 def cmd_untwist(args):
     try:
-        with open(args.infile, encoding="utf-8") as f:
+        with io.open(args.infile, "r", encoding="utf-8") as f:
             content = f.read()
     except IOError as err:
         print("Error: {0}".format(err), file=sys.stderr)
@@ -644,7 +646,7 @@ def cmd_stack(args):
         prime_list = [p.strip() for p in args.primes.split(",") if p.strip()]
     else:
         try:
-            with open(args.verse_file, encoding="utf-8") as f:
+            with io.open(args.verse_file, "r", encoding="utf-8") as f:
                 verses = [l.rstrip("\r\n") for l in f if l.strip()]
         except IOError as err:
             print("Error: {0}".format(err), file=sys.stderr)
@@ -707,7 +709,7 @@ def cmd_stack(args):
 
 def cmd_unstack(args):
     try:
-        with open(args.infile, encoding="utf-8") as f:
+        with io.open(args.infile, "r", encoding="utf-8") as f:
             content = f.read()
     except IOError as err:
         print("Error: {0}".format(err), file=sys.stderr)
