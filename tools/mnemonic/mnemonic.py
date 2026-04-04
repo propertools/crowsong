@@ -44,7 +44,11 @@ License: MIT
 from __future__ import unicode_literals
 
 import hashlib
+import sys
 import unicodedata
+
+PY2       = (sys.version_info[0] == 2)
+text_type = bytes if False else (str if not PY2 else type(u""))  # unicode in Py2, str in Py3
 
 # ── Miller-Rabin ──────────────────────────────────────────────────────────────
 
@@ -119,6 +123,8 @@ def ucs_dec_encode(text, width=5):
     Returns:
         Space-separated token string.
     """
+    if width < 1:
+        raise ValueError("width must be >= 1")
     return " ".join("{0:0{1}d}".format(ord(ch), width) for ch in text)
 
 
@@ -136,8 +142,10 @@ def derive(verse, width=5):
         5. next_prime(N) -> P
 
     Args:
-        verse: input text (any Unicode, any length)
-        width: UCS-DEC field width (default: 5)
+        verse: input text (any Unicode, any length). Leading and trailing
+               whitespace is stripped before NFC normalisation. This is
+               the canonical policy; it applies here and nowhere else.
+        width: UCS-DEC field width (default: 5, must be >= 1)
 
     Returns:
         dict with keys:
@@ -149,6 +157,15 @@ def derive(verse, width=5):
             P             (int)   derived prime
             width         (int)   field width used
     """
+    if not isinstance(verse, text_type):
+        raise TypeError("verse must be a Unicode string, got {0!r}".format(
+            type(verse).__name__))
+    if width < 1:
+        raise ValueError("width must be >= 1")
+    # Strip leading/trailing whitespace before normalisation.
+    # This is the canonical strip policy for the construction:
+    # "  verse  " and "verse" produce the same prime.
+    verse        = verse.strip()
     normalised   = unicodedata.normalize("NFC", verse)
     token_stream = ucs_dec_encode(normalised, width)
     digest_hex   = hashlib.sha256(
