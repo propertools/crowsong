@@ -213,6 +213,26 @@ The primes exist nowhere until the moment of derivation.
 
 ---
 
+## What this system actually is
+
+UCS-DEC and CCL together form a layered signal survival system:
+
+- The encoding is human-operable without software
+- The camouflage is indistinguishable from AES output
+- The keys are distributed across human memory, public mathematics,
+  and the cultural record
+- The key material pre-exists in public corpora — it cannot be
+  addressed without knowing the seeds
+- The seeds are deniable, non-obvious, and survivable across hardware
+  loss, border crossings, and coercion
+- The whole thing runs in pure Python with no external dependencies,
+  compatible back to Python 2.7, so that the Crowsong system can be
+  operated entirely from a git checkout running off an embedded Python
+  interpreter on an old Android phone you picked up in a pawn shop after you crossed
+  the border
+
+---
+
 ## The design in one sentence
 
 Every layer of the system must be operable by a human with patience and
