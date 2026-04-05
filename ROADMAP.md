@@ -46,6 +46,8 @@ round-trips cleanly; tested in suite.
 |---|------|--------|-----------|
 | 6 | Resource fork (minimal) | ⬜ todo | `RSRC: BEGIN/END`, dependency-based ordering, interrupted transmission guarantees |
 | 7 | WIDTH/3 BINARY mode | ⬜ todo | Byte-stream encoding; `BINARY` flag in `ENC:` header; decoder emits raw bytes; CCL base schedule requires separate resolution (see CCL draft §11.4) |
+| 7a | Content-addressable artifact identity | ⬜ todo | SHA256 of UCS-DEC body in header as version identifier; enables diff/delta transmission at the representation layer |
+| 7b | Delta transmission format | ⬜ todo | Token-level diff (FROM: sha256, TO: sha256, DELTA: UCS-DEC encoded diff); human-applicable by hand on Class D channels; receiver verifies arrival hash |
 | 8 | Structural Principles: Principle 11 | ✅ done (`-00`) | SHOULD as design smell; optionality via composable components |
 | 9 | Structural Principles: Principle 12 | ✅ done (`-00`) | Timestamps as claims; discardable outer layer |
 | 10 | Structural Principles: Principle 13 | ✅ done (`-00`) | Availability and integrity before confidentiality |
@@ -71,6 +73,52 @@ Status: informative section, 1–2 pages.
 | Corruption test (DESTROY flag + verification failure → non-zero exit) | ✅ done (`-00`) |
 | WIDTH/3 BINARY roundtrip | ⬜ todo |
 | Resource fork roundtrip | ⬜ todo |
+
+### Protocol versioning — design principle
+
+The 2038 problem exists because a design assumption (32-bit time_t)
+was baked into implementations without a versioning or replacement
+mechanism. When the assumption became wrong there was no graceful
+path — only flag day or flag decade.
+
+The structural lesson: every component that makes an assumption about
+representation, encoding, or protocol semantics must declare that
+assumption explicitly and version it, such that a replacement
+component can be introduced without requiring simultaneous upgrade of
+everything that depends on it.
+
+For Crowsong this means every artifact carries machine-readable version
+fields for every component it references:
+
+```
+VERSION:  1
+ENCODING: UCS-DEC/1
+CCL:      prime-twist/1
+SCHEDULE: standard/1
+```
+
+A tool that encounters `CCL: prime-twist/2` it does not understand
+MUST fail loudly and explicitly, not silently misinterpret.
+
+**The modular composability guarantee:** if each layer declares its
+version and each tool checks it, the CCL construction can be upgraded
+without touching FDS, the schedule can be upgraded without touching
+CCL, the prime derivation can be upgraded without touching anything
+downstream. The interfaces are the stable thing; the implementations
+behind them are replaceable.
+
+The RSRC block is the right mechanism — it is a self-describing
+metadata layer that carries version information for every component
+it references. An artifact found in a Vesper archive in 2038 can be
+read by looking at the RSRC block to determine exactly what version
+of every component was used to produce it.
+
+This is not just documentation hygiene. It is the structural design
+pattern that avoids repeating 2038.
+
+**Implementation requirement:** all reference implementations MUST
+be versioning-aware from the first release. Retrofitting versioning
+is exactly the failure mode we are designing around.
 
 ### Definition of done
 
@@ -123,10 +171,9 @@ Phase 4 — Release (~30 min)
 |------|-------|
 | Full FDS-FTP spec | Multipart, resumability, retransmission request format |
 | MIME type quick reference appendix | Companion to FDS Unicode reference table |
-| Crowsong Mobile | Offline Android/iOS decoder — OCR + CCL unstack + key derivation + MDM install; see architecture sketch |
 | Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery |
 | Story infrastructure | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
-| Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline, in progress |
+| Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
 | Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
 | Channel Camouflage Layer (CCL) | Informative profile; prime-twist test implementation complete; normative spec pending KDF selection |
 | Duress decoy forks | Multi-fork FDS artifacts with per-fork verse-derived keys; plausible deniability at hostile border crossings; see design note below |
