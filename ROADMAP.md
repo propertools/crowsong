@@ -123,9 +123,10 @@ Phase 4 — Release (~30 min)
 |------|-------|
 | Full FDS-FTP spec | Multipart, resumability, retransmission request format |
 | MIME type quick reference appendix | Companion to FDS Unicode reference table |
+| Crowsong Mobile | Offline Android/iOS decoder — OCR + CCL unstack + key derivation + MDM install; see architecture sketch |
 | Morse grouping conventions for WIDTH/3 BINARY | Prosign-friendly chunking; operator fatigue; error recovery |
 | Story infrastructure | `story/ghost-line.md`, prose PR model, decomposition log — develop in parallel with `-01`, not gated on tag |
-| Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline |
+| Aeolian Layer draft | `draft-darley-aeolian-dtn-arch-01` — its own document, its own timeline, in progress |
 | Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
 | Channel Camouflage Layer (CCL) | Informative profile; prime-twist test implementation complete; normative spec pending KDF selection |
 | Duress decoy forks | Multi-fork FDS artifacts with per-fork verse-derived keys; plausible deniability at hostile border crossings; see design note below |
