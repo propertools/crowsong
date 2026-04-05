@@ -248,3 +248,69 @@ A contribution is useful if it makes the system more likely to carry a
 signal across a gap.
 
 That is the test.
+
+---
+
+## Principle 14: Every assumption must declare its version
+
+A design assumption baked into an implementation without an explicit
+version identifier and a replacement mechanism is a time bomb. The
+2038 problem exists because `time_t` was defined as a 32-bit integer
+without a versioning or negotiation mechanism. When the assumption
+became wrong there was no graceful path.
+
+Every component that encodes an assumption about representation,
+encoding, or protocol semantics MUST declare that assumption
+explicitly with a version identifier. Reference implementations MUST
+check version fields and MUST fail loudly when encountering a version
+they do not support. Silent misinterpretation of an unknown version
+is the failure mode we are designing around.
+
+```
+VERSION:  1
+ENCODING: UCS-DEC/1
+CCL:      prime-twist/1
+SCHEDULE: standard/1
+```
+
+A reader encountering `CCL: prime-twist/2` it does not recognise
+MUST NOT attempt to decode the CCL layer. It MUST surface the version
+mismatch to the operator.
+
+The interfaces between components are the stable thing. The
+implementations behind them are replaceable — but only if the
+interfaces are versioned from the first release. Retrofitting
+versioning is exactly the failure mode this principle prevents.
+
+**Corollary:** all reference implementations must be versioning-aware
+from day one. "We'll add versioning later" is not a plan. It is a
+promise to create a future flag day.
+
+---
+
+## Principle 15: Content identity is a hash, not a name
+
+An artifact's identity is the SHA256 of its UCS-DEC body. Two
+artifacts with the same hash are identical by definition. A name
+(reference ID, filename, URL) is a convenience, not an identity.
+
+This enables diff and delta transmission at the representation layer:
+
+```
+FROM:  sha256:<hex of source artifact body>
+TO:    sha256:<hex of target artifact body>
+DELTA: <UCS-DEC encoded token-level diff>
+```
+
+The receiver who holds the FROM artifact applies the delta and
+verifies they arrive at the TO artifact by recomputing the hash.
+No external coordination is required. The hash is the coordination
+mechanism.
+
+Over degraded channels this is significant: transmit the delta, not
+the full artifact. Over Class D channels (human relay, Morse, printed
+page) a token-level diff is human-readable and manually applicable —
+which matters when software is unavailable.
+
+Names change. Hashes do not. Content-addressable identity is a
+precondition for reliable delta transmission.
