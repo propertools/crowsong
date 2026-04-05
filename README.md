@@ -228,7 +228,7 @@ UCS-DEC and CCL together form a layered signal survival system:
 - The whole thing runs in pure Python with no external dependencies,
   compatible back to Python 2.7, so that the Crowsong system can be
   operated entirely from a git checkout running off an embedded Python
-  interpreter on an old Android phone you picked up in a pawn shop after you crossed
+  interpreter on an old Android phone you picked up after you crossed
   the border
 
 ---
@@ -303,6 +303,39 @@ in the in-progress `draft-darley-aeolian-dtn-arch-01` — the passive
 listeners are called Crows.
 
 A crowsong is what they hear.
+
+---
+
+## Regulatory status
+
+The regulatory attack surface is essentially zero.
+
+What would they regulate? The number 65? The fact that 'A' has a Unicode
+code point? The act of writing decimal integers with spaces between them?
+
+UCS-DEC is a subset of the decimal number system, which predates every
+government currently in existence. It references the Unicode standard,
+maintained by a consortium of the world's largest technology companies
+and load-bearing for essentially all modern computing. It is implemented
+in a Python script that does arithmetic a child could do by hand. It is
+owned by no one, patented by no one, funded by no one, and depended upon
+by nothing.
+
+The CCL layer is even harder to regulate. It is base conversion. The
+mathematical relationship between base 10 and base 7 has been known since
+there were bases. You cannot make it illegal to represent 65 in base 8
+without making arithmetic itself a controlled technology.
+
+The closest legal hook would be export control on cryptography — but the
+spec explicitly and loudly states that CCL provides no cryptographic
+confidentiality. That is not a loophole. That is accurate. It is
+documented that way because it is true.
+
+The practical test: load-bearing for nothing, used by no existing
+applications, no commercial interest, no vendor, no revenue. Regulators
+follow harm and they follow money. This has neither.
+
+See `EU_DECLARATION_OF_CONFORMITY.md`.
 
 ---
 
