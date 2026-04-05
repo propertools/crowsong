@@ -184,10 +184,17 @@ def fetch_metadata(seq_id):
     body = _fetch(url)
     data = json.loads(body)
 
-    if not data.get("results"):
+    # OEIS API returns either a dict with a "results" key, or the results
+    # list directly. Handle both.
+    if isinstance(data, list):
+        results = data
+    else:
+        results = data.get("results") or []
+
+    if not results:
         raise ValueError("sequence not found: {0}".format(seq_id))
 
-    r = data["results"][0]
+    r = results[0]
     return {
         "id":          "A{0:06d}".format(r["number"]),
         "name":        r.get("name", ""),
