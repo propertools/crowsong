@@ -158,6 +158,82 @@ confidentiality; encrypt first if confidentiality is required.
 | USB sneakernet | Boring but honest |
 | Telemetry CSV / log injection | CCL variant; zero forensic signature |
 
+## Asynchronous key separation
+
+The payload and the keys have completely different transport requirements.
+This is an operational capability, not an implementation detail.
+
+**Phase 1 — payload transfer** (bandwidth-sensitive, timing-flexible)
+
+```
+firmware.bin
+  → UCS-DEC + CCL3
+  → transmitted whenever the link is up
+  → recipient stores the camouflaged artifact
+```
+
+The artifact is statistically indistinguishable from noise. Interception
+reveals nothing. The recipient cannot use it yet. It sits inert until the
+key arrives.
+
+Pre-positioning is possible: transmit the firmware to every clinic in the
+region when the satellite window is open. The artifacts are inert until
+needed. No secrecy required for the transmission itself.
+
+**Phase 2 — key transfer** (minimal bandwidth, timing-critical)
+
+```
+"The signal strains, but never gone" + π + offset 1000
+  → transmissible as:
+      a voice call over POTS ("remember the poem")
+      a single SMS
+      a Morse burst
+      a postcard
+      spoken to a courier
+      memorised before departure
+```
+
+The entire key transfer is under 30 seconds of speech. A verse and a
+sequence name. The key is arbitrarily small; the payload was arbitrarily
+large.
+
+**Why timing separation matters:**
+
+The key is released only when the operator is confident the recipient
+is legitimate and the situation is right. Payload interception at any
+prior point is harmless — the artifact is noise without the key.
+
+**The vulnerability inversion:**
+
+Normally payload and key travel together. Intercept one transmission,
+get everything. Here:
+
+- Payload intercepted alone: attacker has noise, no key
+- Key intercepted alone: attacker has a poem, no artifact to apply it to
+- Both intercepted independently: attacker still needs to know *which*
+  artifact the key unlocks, *which* sequence, *which* offset
+
+The `IF COUNT FAILS: DESTROY IMMEDIATELY` flag in the FDS framing means
+the recipient cannot even verify integrity without the key. The key is
+the gate. The artifact enforces this structurally.
+
+**The firmware variant specifically:**
+
+The recipient verifies CRC32 before flashing. They cannot proceed
+without the key. If the key never arrives — because the operator lost
+confidence in the situation — the artifact expires as inert noise.
+The device is never flashed with unverified firmware.
+
+The channel between them could be a satellite uplink for the payload
+and a POTS voice call for the key. It could be a fax for the payload
+and a courier for the key. It could be a radio burst for the payload
+and a memorised verse for the key.
+
+The stack does not require both transfers to happen at the same time,
+over the same channel, or even in the same country.
+
+---
+
 ## Deferred
 
 Full fax page profile (alignment marks, Reed-Solomon) is far-horizon work.
