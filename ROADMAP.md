@@ -177,6 +177,7 @@ Phase 4 — Release (~30 min)
 | Mnemonic Share Wrapping | `draft-darley-shard-bundle-01` — verse-derived KDF unlocks Shamir shares; see design sketch |
 | Channel Camouflage Layer (CCL) | Informative profile; prime-twist test implementation complete; normative spec pending KDF selection |
 | Duress decoy forks | Multi-fork FDS artifacts with per-fork verse-derived keys; plausible deniability at hostile border crossings; see design note below |
+| `tools/git/gitbundle.py` | Pure Python git bundle tool (create, unbundle, verify, ls); shells out to system git by default, falls back to Dulwich; enables repo-as-payload over any FDS channel; see design note below |
 
 ### Mnemonic Share Wrapping and CCL — design status
 
@@ -446,6 +447,92 @@ staged release of functionally distinct payloads from a single artifact.
 specification requires resolution of the outer framing design and the
 fork-count concealment mechanism. Tracked here pending a dedicated
 design sketch.
+
+---
+
+## git bundle as payload type — design note
+
+A git repository is already a content-addressable store. Every object
+is SHA256-identified. The DAG gives you versioning, branching, delta
+compression, and history for free. A git bundle (`git bundle create`)
+is a single self-contained binary file carrying the entire repo or a
+delta since a known commit.
+
+**The construction:**
+
+```
+git bundle create payload.bundle HEAD
+  → binary blob
+  → WIDTH/3 BINARY UCS-DEC encode
+  → CCL3 (mod3 schedule)
+  → FDS-FRAME  TYPE: git-bundle
+  → transmit over any channel
+```
+
+Receipt:
+
+```
+FDS decode → CCL unstack → binary blob → git bundle unbundle → full repo
+```
+
+The receiver gets not just current content but full history, all
+branches, all commit messages. Provenance is intact. The delta
+transmission problem (Principle 15) is already solved: `git bundle
+create --since=<hash>` transmits only commits since the last sync.
+
+**The Crowsong microdot becomes recursive:** the repo that defines the
+encoding travels as a git bundle encoded in that encoding. The toolchain
+decodes itself on arrival. Keys reconstruct from memory and public
+mathematics. The system is self-hosting across any channel.
+
+**Tool:** `tools/git/gitbundle.py`
+
+Four subcommands:
+
+```
+gitbundle.py create   [--since <hash>] <output.bundle>
+gitbundle.py unbundle <input.bundle>   [--into <dir>]
+gitbundle.py verify   <input.bundle>
+gitbundle.py ls       <input.bundle>
+```
+
+Dependency chain (graceful degradation):
+
+```
+system git      preferred — almost always present
+  ↓ fallback
+dulwich         pip install dulwich — pure Python, MIT licensed,
+                ~800KB, implements full git object model and
+                bundle format; Python 2.7+ (older versions)
+  ↓ fallback
+"bundle operations unavailable — install git or dulwich"
+```
+
+The "no mandatory external dependencies" property is preserved.
+System git is the fast path. Dulwich is the pure-Python fallback
+for environments where git is unavailable. Same pattern as mpmath
+for constants generation.
+
+**Known payload type declaration (resource fork spec):**
+
+```
+TYPE: git-bundle
+```
+
+This type is declared in the `-01` resource fork spec as a known
+payload type. The tool is a mid-horizon deliverable — the spec
+does not wait for the tool.
+
+**Relationship to Principles 14 and 15:**
+
+Git bundle is Principles 14 and 15 already implemented and
+battle-tested. Commit hashes are content-addressable identity.
+Bundle format is versioned (`# v2 git bundle`). Delta transmission
+is `--since`. The git object model is exactly the design pattern
+these principles describe.
+
+**Status:** design intent recorded. `TYPE: git-bundle` to be declared
+in resource fork spec (`fds-01`). Tool implementation mid-horizon.
 
 ---
 
