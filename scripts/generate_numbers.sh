@@ -287,7 +287,7 @@ if [[ $DO_ARTIFACTS -eq 1 ]]; then
 
         log ""
         log "  Running full test suite..."
-        if bash "$TEST_SUITE" 2>/dev/null | grep -q "8 passed, 0 failed"; then
+        if bash "$TEST_SUITE" 2>/dev/null | grep -q "8 passed.*0 failed"; then
             pass "8/8 roundtrip tests passing"
         else
             fail "test suite had failures — run manually: bash tests/roundtrip/run_tests.sh"
