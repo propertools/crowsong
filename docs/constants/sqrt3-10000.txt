@@ -7,7 +7,7 @@
 # Digits:    10000
 # Format:    decimal, 10 digits per group, 6 groups per line
 # SHA256:    78be7dc4af643da6eca1d9dd8fe2af03076cb47294f81ae7cb8fb50a6a00fefb
-# Generated: 2026-04-04
+# Generated: 2026-04-05
 # Tool:      tools/constants.py (Proper Tools SRL)
 #
 # This file contains only decimal digits of √3.
