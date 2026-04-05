@@ -341,6 +341,59 @@ or N forks.
   Duress forks address single-operator coercion resistance at the
   artifact level.
 
+**Generalisation — multi-stakeholder staged release:**
+
+The multi-fork pattern is not limited to decoy/real pairs. Forks can be
+functionally distinct payloads with independent release gates:
+
+```
+Fork 1: firmware binary (compiled)
+        key: verse held by field engineer
+        released: when device is ready to flash
+
+Fork 2: firmware source code
+        key: SHA256(official_logo.png) held by technical lead
+        released: when downstream audit is complete
+
+Fork 3: signing keys and build instructions
+        key: SHA256(internal_document.pdf) held by security officer
+        released: only if fork 2 recipient requests it
+```
+
+Single artifact. Three independently unlockable payloads. Each release
+gate held by a different person in a different role. No single person
+can unlock everything. The artifact travels once.
+
+This is **threshold release**, not threshold reconstruction. Shamir
+splits a secret so N-of-M holders can reconstruct it. This splits a
+payload so each fork is independently accessible to its designated
+keyholder, on its own timeline, under its own conditions.
+
+Operational properties:
+
+- **Role separation** — the engineer who flashes firmware never sees
+  source code; the auditor who reviews source never touches the binary
+- **Temporal separation** — firmware can be flashed before source is
+  released; source can be audited after deployment
+- **Jurisdictional separation** — different forks unlockable in different
+  countries under different legal regimes
+- **Deniability by design** — a fork that has not been unlocked does not
+  demonstrably exist from the artifact's exterior
+
+This composes with asynchronous key separation: the artifact
+pre-positions everywhere via the high-bandwidth channel, then each
+keyholder releases their fork independently via the low-bandwidth
+channel — a voice call, a verse, a poem over POTS — when their
+conditions are met.
+
+The `IF COUNT FAILS: DESTROY IMMEDIATELY` flag on each fork means a
+failed unlock attempt does not compromise the others. Each fork fails
+independently.
+
+The coercion resistance (decoy/real) pattern is a special case of this
+more general capability. The general capability is multi-stakeholder
+staged release of functionally distinct payloads from a single artifact.
+
 **Status:** design intent recorded. No implementation. Normative
 specification requires resolution of the outer framing design and the
 fork-count concealment mechanism. Tracked here pending a dedicated
