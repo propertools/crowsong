@@ -231,6 +231,47 @@ draft Aeolian Layer        delay-tolerant mesh over non-standard media
 
 ---
 
+## What the system is capable of
+
+The repo that defines the encoding can be transmitted using the encoding.
+
+A UCS-DEC tarball of the entire Crowsong repository fits in a
+photographic microdot — invisible to casual inspection, printable on
+any photograph, recoverable with a magnifier and patience. The toolchain
+decodes itself on arrival. The keys reconstruct from memory and from
+public mathematics that has existed for centuries.
+
+There is nothing preventing someone from carrying the entire Crowsong
+system across a border as a microdot on a tourist snapshot. On the
+other side: a git checkout, an old Android phone, an embedded Python
+interpreter, and the system is operational. The keys come from a poem
+held in memory and a meme posted publicly years ago. The key material
+was already encoded in π before the operator was born.
+
+The adversary's options are:
+
+- Confiscate all photographs — impractical at scale
+- Confiscate all printed material — impractical at scale
+- Prevent memorisation of poetry — impossible
+- Erase π — impossible
+
+The attack surface is the human, not the system. The system was
+designed knowing that.
+
+This means the Vesper archive is not only long-horizon storage. It is
+a deployment mechanism. The FDS quick reference card tells you how to
+decode what you find. The encoding is human-operable without software.
+The camouflage is indistinguishable from AES output. The keys are
+distributed across memory, mathematics, and the cultural record.
+
+The system was designed for the network not existing at all. It turns
+out it was also designed for borders, confiscation, censorship, and
+the specific category of adversary who can observe everything except
+what has already been memorised and what is already in the cultural
+record.
+
+---
+
 ## On the name
 
 In the Aeolian Layer — a delay-tolerant mesh operating over
