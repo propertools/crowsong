@@ -96,6 +96,7 @@ import time
 # Shared construction library — primality testing and verse-to-prime derivation.
 # Single canonical implementation shared with verse_to_prime.py.
 from mnemonic import derive as _mnemonic_derive  # noqa: E402
+from mnemonic import is_prime as _is_prime        # noqa: E402
 
 PY2 = (sys.version_info[0] == 2)
 
@@ -145,6 +146,8 @@ def _from_base(s, base):
     """Parse string s in given base to int."""
     if base == 10:
         return int(s)
+    if not (2 <= base <= 9):
+        raise ValueError("base must be 2-9 for non-decimal, got {0}".format(base))
     return int(s, base)
 
 
@@ -266,7 +269,7 @@ def decode_twist_map(encoded, total_count):
         if len(parts) == 2:
             try:
                 pos, base = int(parts[0]), int(parts[1])
-                if 0 <= pos < total_count:
+                if 0 <= pos < total_count and 2 <= base <= 10:
                     result[pos] = base
             except ValueError:
                 continue
@@ -298,15 +301,11 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
 
     pad        = "0" * width
     real_count = len([t for t in twisted_tokens if t != pad])
-    crc        = binascii.crc32(payload.encode("utf-8")) & 0xFFFFFFFF
-    crc_str    = format(crc, "08X")
     generated  = time.strftime("%Y-%m-%d")
     changed    = sum(1 for b in twist_map if b != 10)
 
     enc_line = "ENC: UCS {d} DEC {d} COL/6 {d} PAD/{p} {d} WIDTH/{w}".format(
         d=MIDDLE_DOT, p=pad, w=width)
-    cnt_line = "{n} VALUES {d} CRC32:{crc}".format(
-        d=MIDDLE_DOT, n=real_count, crc=crc_str)
 
     rsrc_lines = [
         "RSRC: BEGIN",
@@ -326,6 +325,13 @@ def make_artifact(twisted_tokens, twist_map, prime_str,
     rsrc_lines.append(
         "  TWIST-MAP:  {0}".format(encode_twist_map(twist_map)))
     rsrc_lines.append("RSRC: END")
+
+    rsrc_text  = "\n".join(rsrc_lines)
+    crc_input  = (payload + "\n" + rsrc_text).encode("utf-8")
+    crc        = binascii.crc32(crc_input) & 0xFFFFFFFF
+    crc_str    = format(crc, "08X")
+    cnt_line   = "{n} VALUES {d} CRC32:{crc}".format(
+        d=MIDDLE_DOT, n=real_count, crc=crc_str)
 
     header_lines = [_box_rule()]
     if ref:
@@ -393,7 +399,7 @@ def parse_artifact(content):
     return {
         "prime_str":     fields.get("PRIME", ""),
         "schedule":      fields.get("SCHEDULE", SCHEDULE_STANDARD),
-        "width":         int(fields.get("WIDTH", "5")),
+        "width":         max(1, min(20, int(fields.get("WIDTH", "5")))),
         "twist_map_enc": fields.get("TWIST-MAP", ""),
         "twisted_tokens": twisted_lines,
         "token_count":   len(twisted_lines),
@@ -583,10 +589,13 @@ def cmd_twist(args):
         print("Error: empty input", file=sys.stderr)
         return 1
     try:
-        int(args.prime)
+        p_val = int(args.prime)
     except ValueError:
         print("Error: --prime must be a decimal integer", file=sys.stderr)
         return 1
+    if not _is_prime(p_val):
+        print("Warning: --prime is not prime; construction expects a prime",
+              file=sys.stderr)
 
     twisted_tokens, twist_map = twist(
         data, args.prime, width=args.width, schedule=args.schedule)
@@ -669,11 +678,14 @@ def cmd_stack(args):
 
     for i, p in enumerate(prime_list):
         try:
-            int(p)
+            p_val = int(p)
         except ValueError:
             print("Error: prime {0} is not a valid integer".format(i + 1),
                   file=sys.stderr)
             return 1
+        if not _is_prime(p_val):
+            print("Warning: prime {0} is not prime; construction expects a prime".format(
+                i + 1), file=sys.stderr)
 
     print("Stack depth: {0}".format(depth), file=sys.stderr)
 
