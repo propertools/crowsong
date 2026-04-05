@@ -310,6 +310,42 @@ COLLISION:   first-hit
 STEPS:       25                   (floor(len(P_digits) / k))
 ```
 
+**Concrete example — corporate logos as binary seeds:**
+
+```
+SHA256(microsoft_logo.png) → P₁ → addresses bytes in π
+SHA256(google_logo.png)    → P₂ → addresses bytes in e
+SHA256(apple_logo.png)     → P₃ → addresses bytes in φ
+P₁ + P₂ + P₃ → three Shamir shares → master key
+```
+
+The logos are public, on every website, retrievable from the internet
+archive. Possessing them proves nothing. Everyone has them.
+
+The secret is: *which logos, which versions, which order, which
+sequence, which offset.*
+
+The Google logo changed in 2015. The Microsoft logo changed in 2012.
+Which version is part of the secret. That is knowledge, not data.
+It is not written down anywhere. It is recoverable from memory and
+from the internet archive.
+
+The adversary sees three corporate logos. There is no key here.
+
+Properties of this construction:
+- Publicly available seeds — retrievable by anyone
+- Culturally indestructible — these files will exist for decades
+- Version-sensitive — which revision is the secret
+- Order-sensitive — P₁, P₂, P₃ in a specific sequence
+- Individually unremarkable — possessing any one proves nothing
+- Jointly specific — the combination is held only in memory
+- Deniable — "I just had some logo files" is entirely plausible
+
+This is the binary seed construction made tangible. Any set of
+canonical public files — logos, album covers, flag images, official
+portraits — can serve as seeds. The files are the key. The key exists
+nowhere until derived.
+
 **Status:** binary seed derivation implemented in `mnemonic.py`
 (pending). Sparse addressing construction designed; implementation
 in progress. Normative specification deferred pending empirical
