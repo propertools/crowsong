@@ -244,9 +244,10 @@ public mathematics that has existed for centuries.
 There is nothing preventing someone from carrying the entire Crowsong
 system across a border as a microdot on a tourist snapshot. On the
 other side: a git checkout, an old Android phone, an embedded Python
-interpreter, and the system is operational. The keys come from a poem
-held in memory and a meme posted publicly years ago. The key material
-was already encoded in π before the operator was born.
+interpreter, and the system is operational. The key shards come from a poem
+held in memory, a song on the radio, and a meme posted publicly years ago.
+
+The key material was already encoded in π before the operator was born.
 
 The adversary's options are:
 
