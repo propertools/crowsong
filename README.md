@@ -285,6 +285,9 @@ Expected result: legible text.
 **Local knowledge infrastructure:**
 `docs/vesper-mirror-architecture.md`
 
+**Mobile app architecture:**
+`docs/crowsong-mobile-architecture.md`
+
 **Mnemonic key wrapping and CCL:**
 `docs/mnemonic-shamir-sketch.md`
 
