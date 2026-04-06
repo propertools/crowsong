@@ -291,38 +291,20 @@ Expected result: legible text.
 
 ## Where to go next
 
-**Start here (implementation):**
-`drafts/draft-darley-fds-00.txt`
-
-**Architecture:**
-`drafts/draft-darley-crowsong-00.txt`
-
-**Trust layer:**
-`drafts/draft-darley-shard-bundle-00.txt`
-
-**Content continuity:**
-`drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt`
-
-**Design doctrine:**
-`docs/structural-principles.md`
-
-**Full suite overview:**
-`docs/crowsong-suite-overview.md`
-
-**Long-horizon physical archival:**
-`docs/vesper-archive-protocol.md`
-
-**Local knowledge infrastructure:**
-`docs/vesper-mirror-architecture.md`
-
-**Mnemonic key wrapping and CCL:**
-`docs/mnemonic-shamir-sketch.md`
-
-**CCL full capability demo:**
-`demo/ccl_demo.sh`
-
-**Roadmap:**
-`docs/crowsong-roadmap.md`
+| | |
+|---|---|
+| **Start here (implementation)** | [drafts/draft-darley-fds-00.txt](drafts/draft-darley-fds-00.txt) |
+| **Architecture** | [drafts/draft-darley-crowsong-00.txt](drafts/draft-darley-crowsong-00.txt) |
+| **Trust layer** | [drafts/draft-darley-shard-bundle-00.txt](drafts/draft-darley-shard-bundle-00.txt) |
+| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt) |
+| **Design doctrine** | [docs/structural-principles.md](docs/structural-principles.md) |
+| **Full suite overview** | [docs/crowsong-suite-overview.md](docs/crowsong-suite-overview.md) |
+| **Long-horizon physical archival** | [docs/vesper-archive-protocol.md](docs/vesper-archive-protocol.md) |
+| **Local knowledge infrastructure** | [docs/vesper-mirror-architecture.md](docs/vesper-mirror-architecture.md) |
+| **Mobile app architecture** | [docs/crowsong-mobile-architecture.md](docs/crowsong-mobile-architecture.md) |
+| **Mnemonic key wrapping and CCL** | [docs/mnemonic-shamir-sketch.md](docs/mnemonic-shamir-sketch.md) |
+| **CCL full capability demo** | [demo/ccl_demo.sh](demo/ccl_demo.sh) |
+| **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |
 
 ---
 
