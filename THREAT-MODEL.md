@@ -39,22 +39,88 @@ confiscation, censorship, and coercion.
 ### Class A — Passive observer
 
 **Capability:** monitors the channel; cannot modify traffic; performs
-statistical analysis on intercepted data.
+statistical analysis on intercepted data. May use automated
+script-identification, language fingerprinting, or signals intelligence
+tools that classify traffic by the statistical distribution of token
+values.
 
 **Goal:** identify that a covert signal is present; determine payload
-content.
+content; identify the language or script of the payload; attribute the
+signal to a sender profile.
 
 **System response:**
-- CCL3 output is statistically indistinguishable from AES-128 ciphertext
-  (8.37 bits/token, exceeding the AES-128 reference of ~7.9–8.0 bits/byte)
-- Five-digit decimal tokens are indistinguishable from telemetry, log
-  files, financial reference numbers, or cross-reference lists
-- The passive observer cannot distinguish CCL3 output from noise on the
-  basis of entropy alone
 
-**Limitation:** CCL provides no cryptographic confidentiality. A passive
-observer who obtains the artifact and the key can decrypt. CCL raises the
-cost of *attention*, not the cost of *decryption given attention*.
+*Entropy:* CCL3 output is statistically indistinguishable from AES-128
+ciphertext (8.37 bits/token, exceeding the AES-128 reference of
+~7.9–8.0 bits/byte). The passive observer cannot distinguish CCL3 output
+from noise on the basis of entropy alone.
+
+*Token appearance:* Five-digit decimal tokens are indistinguishable from
+telemetry, log files, financial reference numbers, or cross-reference
+lists.
+
+*Script fingerprinting — the side-channel CCL alone cannot fully mask:*
+
+UCS-DEC encodes each character as its Unicode code point. Scripts cluster
+tightly in the token value space:
+
+- ASCII/Latin:  tokens 00032–00126   (range 94)
+- Arabic:       tokens 01536–01791   (range 255)
+- CJK unified:  tokens 19968–40959   (range ~21,000)
+- Hangul:       tokens 44032–55203   (range ~11,000)
+
+These clusters are recognisable fingerprints. A passive observer
+performing frequency analysis on the token value distribution can
+identify the script — and therefore the likely language, origin, and
+subject matter of the payload — even before CCL is applied.
+
+CCL partially masks this for ASCII (small token values are highly
+twistable) but is structurally limited for high-codepoint scripts.
+The CCL feasibility rule is `base^WIDTH > token_value`. For a CJK token
+at value 30,000, only base 9 satisfies `9^5 = 59,049 > 30,000`, and
+base 10 (no twist) satisfies no criterion — meaning only one base is
+ever feasible for a large fraction of CJK tokens. The Arabic and CJK
+cluster signatures survive CCL at reduced but detectable levels.
+
+*The symbol layer destroys the script fingerprint:*
+
+The symbol substitution layer (tools/mnemonic/symbol_twist.py) applies
+a key-derived bijection over 62,584 eligible Unicode code points before
+CCL runs. Each token value V is mapped to a different code point
+drawn from across the full eligible range. The mapping is a keyed
+permutation (Fisher-Yates shuffle seeded from the symbol layer prime P1).
+
+The effect:
+- The tight Arabic cluster (01536–01791) is scattered across 0–99,999
+- The tight CJK cluster (19968–40959) is similarly dispersed
+- The resulting distribution is indistinguishable from any other script
+- CCL then operates on well-spread token values with higher twist rates
+- The permutation is key-dependent: the same plaintext under a different
+  key produces a completely different token distribution
+
+The script fingerprint is destroyed before CCL runs. Neither the script,
+the language, nor the Unicode block structure of the original text is
+recoverable from traffic analysis alone.
+
+**Limitation:** CCL and the symbol layer provide no cryptographic
+confidentiality. A passive observer who obtains the artifact and both
+keys (P1 for symbol layer, P2 for CCL) can reverse both transforms.
+These layers raise the cost of *attention* and *attribution*, not the
+cost of *decryption given attention and keys*.
+
+**Construction hierarchy:**
+
+For ASCII/Latin payloads: CCL3 alone is sufficient. The symbol layer
+adds visual camouflage (typographic symbols rather than decimal digits)
+but minimal additional entropy.
+
+For Arabic, CJK, Hangul, Devanagari, or any high-codepoint script:
+the symbol layer is operationally necessary to destroy the script
+fingerprint before CCL runs.
+
+For mixed-script or unknown content: apply the symbol layer always.
+It is a 1:1 bijection — no token count expansion, no information loss,
+negligible overhead.
 
 ---
 
@@ -273,6 +339,114 @@ applied on top.
 
 ---
 
+## Symbol layer — script fingerprint resistance
+
+The symbol substitution layer addresses a specific signals intelligence
+threat that CCL alone cannot fully resolve: script identification from
+token value distributions.
+
+### The attack
+
+A passive observer with automated traffic analysis tools can classify
+the script — and therefore the likely language and origin — of a UCS-DEC
+payload by examining the distribution of token values. Unicode assigns
+code points in contiguous script blocks. Arabic text produces tokens
+clustered in 01536–01791. CJK text produces tokens clustered in
+19968–40959. These distributions are as distinctive as a language model
+fingerprint.
+
+### Why CCL is insufficient for high-codepoint scripts
+
+CCL's base-switching feasibility rule (`base^WIDTH > token_value`)
+becomes increasingly restrictive as token values increase. For a token
+value of 40,000:
+
+```
+2^5 =     32  ≤ 40,000  → base 2 infeasible
+3^5 =    243  ≤ 40,000  → base 3 infeasible
+4^5 =  1,024  ≤ 40,000  → base 4 infeasible
+5^5 =  3,125  ≤ 40,000  → base 5 infeasible
+6^5 =  7,776  ≤ 40,000  → base 6 infeasible
+7^5 = 16,807  ≤ 40,000  → base 7 infeasible
+8^5 = 32,768  ≤ 40,000  → base 8 infeasible
+9^5 = 59,049  > 40,000  → base 9 feasible ✓
+```
+
+Only base 9 is feasible. The CCL twist rate for CJK text is structurally
+capped at the fraction of tokens for which the scheduled digit happens to
+be 9. The Arabic and CJK cluster signatures survive in attenuated form.
+
+### The symbol layer construction
+
+The symbol layer applies a key-derived bijection before CCL:
+
+1. Enumerate 62,584 eligible Unicode code points (assigned, non-control,
+   non-combining, ≤ U+1869F, WIDTH/5-safe)
+2. Permute this list using Fisher-Yates shuffle seeded from SHA256 of
+   the symbol layer prime P1
+3. Map each input token value V to candidates[permutation[V]]
+4. The output token is the code point of the mapped symbol, WIDTH/5-encoded
+
+Properties:
+- Bijection: every distinct input token maps to a distinct output token
+- 1:1: no expansion — N tokens in, N tokens out
+- Key-dependent: different P1 → different permutation → different output
+- Reversible: given P1 and the candidates list, the permutation is
+  fully recoverable
+- Script-blind: the mapping is independent of the script of the input
+
+After the symbol layer, the tight Arabic and CJK clusters are scattered
+across the full 0–62,583 eligible range. CCL then achieves high twist
+rates on the dispersed values.
+
+### Operational guidance
+
+Apply the Gloss Layer (gloss_twist.py) when:
+
+- The payload contains Arabic, Hebrew, CJK, Hangul, Devanagari, or any
+  script with code points above U+0800 (~2,048)
+- The script of the payload must not be inferrable from traffic analysis
+- The operator is in an environment with automated language/script
+  identification on monitored channels
+
+The Gloss Layer produces a 3x token expansion (each input token becomes
+3 output tokens) but converts all token values to the ASCII range (65-122).
+CCL then operates on this ASCII-range stream with bases 3-9 fully feasible
+on every token — achieving high twist rates even for CJK and Arabic content.
+
+Apply symbol_twist.py instead when:
+
+- Human visual inspection is the primary threat (not automated analysis)
+- Visual deniability is required (output contains typographic symbols rather
+  than letter sequences)
+- Token count expansion beyond 3x is acceptable
+- The deepcut-v1 typographic aesthetic is operationally relevant
+
+### Key separation
+
+The symbol layer prime P1 and the CCL prime P2 may be the same (one
+verse drives both) or independent (two separate verses or key sources).
+Independent keys provide stronger separation: an adversary who recovers
+P2 (e.g. through coercion) cannot reverse the symbol layer without also
+recovering P1.
+
+Two reference implementations are provided:
+
+    tools/mnemonic/gloss_twist.py  -- Recommended. Base-52 radix re-encoding
+                                      using a key-derived permuted alphabet.
+                                      Maximises CCL entropy for non-Latin scripts.
+                                      Key: reversed digits of P (one prime, two
+                                      schedules, no additional key material).
+
+    tools/mnemonic/symbol_twist.py -- Deepcut-v1 typographic alphabet (¶ § † ‡ ⁂
+                                      ☉ ⁊ ‽ ✦ ☿). Base-N per-digit encoding.
+                                      Primary purpose: visual camouflage. Lower
+                                      entropy ceiling than gloss_twist.py.
+                                      Use when human visual inspection is the
+                                      threat, not automated analysis.
+
+---
+
 ## Design axioms
 
 These are the assumptions that govern every architectural decision.
@@ -312,7 +486,8 @@ border crossings, and coercion.
 
 ## One-line summary
 
-The attack surface is the human, not the system. The system was designed knowing that.
+The attack surface is the human, not the system.
+The system was designed knowing that.
 
 ---
 
