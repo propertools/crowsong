@@ -218,7 +218,7 @@ of passive attention, not the cost of active decryption. For
 confidentiality, encrypt before encoding. For camouflage, apply CCL
 after. The layers are independent and composable.
 
-![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
+![CCL prime-twist construction](./ccl-prime-twist-construction.png)
 
 *Figure: The prime-twist construction. The prime's digits drive a
 cyclic key schedule (the ouroboros). Each digit selects a candidate
