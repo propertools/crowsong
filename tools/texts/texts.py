@@ -388,14 +388,28 @@ TEXTS = {
         "notes":        "6th edition. There is grandeur in this view of life.",
         "tags":         ["science", "english", "mnemonic-anchor"],
     },
-    "euclid-elements": {
-        "gutenberg_id": 21076,
-        "title":        "Euclid's Elements",
-        "author":       "Euclid",
+    "wittgenstein-tractatus": {
+        "gutenberg_id": 5740,
+        "title":        "Tractatus Logico-Philosophicus",
+        "author":       "Ludwig Wittgenstein",
         "language":     "en",
-        "region":       "Ancient Greece",
-        "notes":        "Heath translation. A point is that which has no part.",
-        "tags":         ["mathematics", "greek", "mnemonic-anchor"],
+        "region":       "Austria / England",
+        "notes":        "Ogden translation. The world is everything that is the case.",
+        "tags":         ["philosophy", "logic", "mathematics", "mnemonic-anchor"],
+    },
+    "stapledon-starmaker": {
+        "gutenberg_id": None,
+        "url":          "https://gutenberg.net.au/ebooks06/0601841.txt",
+        "title":        "Star Maker",
+        "author":       "Olaf Stapledon",
+        "language":     "en",
+        "region":       "England",
+        "notes":        "Project Gutenberg Australia. One tremulous arrow of light, "
+                        "projected how many thousands of years ago, now stung my nerves "
+                        "with vision, and my heart with fear. Freeman Dyson credited this "
+                        "book with inspiring the Dyson sphere.",
+        "tags":         ["literature", "science-fiction", "philosophy", "cosmology",
+                         "mnemonic-anchor"],
     },
 
     # ── Poetry ────────────────────────────────────────────────────────────────
@@ -437,10 +451,11 @@ TEXTS = {
     },
 }
 
-GUTENBERG_BASE = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
-USER_AGENT     = "Crowsong/1.0 (trey@propertools.be; Gutenberg mirror for offline use)"
-REQUEST_DELAY  = 3.0   # seconds between requests — be polite
-DEFAULT_DIR    = os.path.join("docs", "texts")
+GUTENBERG_BASE     = "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt"
+GUTENBERG_BASE_ALT = "https://www.gutenberg.org/files/{id}/{id}-0.txt"
+USER_AGENT         = "Crowsong/1.0 (trey@propertools.be; Gutenberg mirror for offline use)"
+REQUEST_DELAY      = 3.0   # seconds between requests — be polite
+DEFAULT_DIR        = os.path.join("docs", "texts")
 
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
@@ -617,8 +632,11 @@ def cmd_show(text_id, out_dir):
     print("Author:     {0}".format(meta["author"]))
     print("Language:   {0}".format(meta["language"]))
     print("Region:     {0}".format(meta["region"]))
-    print("Gutenberg:  https://www.gutenberg.org/ebooks/{0}".format(
-        meta["gutenberg_id"]))
+    if meta.get("url"):
+        print("Source:     {0}".format(meta["url"]))
+    elif meta.get("gutenberg_id"):
+        print("Gutenberg:  https://www.gutenberg.org/ebooks/{0}".format(
+            meta["gutenberg_id"]))
     print("Tags:       {0}".format(", ".join(meta.get("tags", []))))
     print("Notes:      {0}".format(meta["notes"]))
 
@@ -658,7 +676,10 @@ def cmd_fetch(ids, out_dir, force=False, fetch_all=False):
             continue
 
         meta = TEXTS[text_id]
-        url  = GUTENBERG_BASE.format(id=meta["gutenberg_id"])
+        if meta.get("url"):
+            url = meta["url"]
+        else:
+            url = GUTENBERG_BASE.format(id=meta["gutenberg_id"])
         print("  FETCH {0} ({1}) ...".format(text_id, meta["title"][:40]),
               end="")
         sys.stdout.flush()
