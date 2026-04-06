@@ -153,6 +153,36 @@ Signal survives.
 
 ---
 
+## Channel Camouflage Layer
+
+UCS-DEC encodes text as human-readable decimal integers. CCL disguises
+that stream by re-expressing each token in a different numeric base,
+driven by a prime-derived key schedule.
+
+The key is a prime number derived from something memorable — a line of
+poetry, a folk melody, a specific image file. The prime's decimal digits
+become the key schedule, cycling through the prime repeatedly (the
+ouroboros). For each token, the scheduled digit determines the output
+base. The token value is re-expressed in that base, still zero-padded
+to five digits, still valid FDS.
+
+After three passes with three distinct verse-derived primes, the output
+is statistically indistinguishable from AES-128 ciphertext. The twist-map
+— recording which base was used at each position — travels in the
+artifact's resource block. The receiver unstacks in reverse and recovers
+the original stream exactly.
+
+The keys live nowhere until derived. Recite the verse. The prime
+appears. Untwist the artifact. The signal was always there.
+
+CCL provides no cryptographic confidentiality. It raises the cost of
+passive attention, not the cost of active decryption. Encrypt first if
+confidentiality is required. Apply CCL after. The layers are independent.
+
+![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
+
+---
+
 ## Channel Camouflage Layer — quick demo
 
 ```bash
@@ -284,9 +314,6 @@ Expected result: legible text.
 
 **Local knowledge infrastructure:**
 `docs/vesper-mirror-architecture.md`
-
-**Mobile app architecture:**
-`docs/crowsong-mobile-architecture.md`
 
 **Mnemonic key wrapping and CCL:**
 `docs/mnemonic-shamir-sketch.md`
