@@ -27,6 +27,37 @@ Crowsong assumes the network may not exist at all.
 
 ---
 
+## Why this matters
+
+Noor Inayat Khan transmitted in the clear because they took her codes.
+Violette Szabo was caught at a roadblock carrying documents. Virginia Hall
+spent years evading the Gestapo with a wooden leg and sheer nerve, in part
+because she understood operational security at a level her handlers didn't.
+
+SOE agents were fingerprinted by their radio keying patterns. Networks
+unravelled because a single courier knew too much. People broke under
+coercion because there was no way to give up only a decoy. Key material
+existed on paper, in rooms, on bodies — and bodies can be searched.
+
+They improvised brilliance under impossible constraints.
+
+Crowsong is the infrastructure that would have given them better options:
+
+- A key that exists nowhere until the moment of derivation
+- "I don't remember which poem" — genuinely unverifiable
+- A decoy fork that produces a real, plausible artifact under duress
+- A network flat enough that breaking one node reveals nothing about the rest
+- An encoding invisible in plain sight, indistinguishable from noise
+- Key material distributed across human memory, public mathematics,
+  and the cultural record — none of which can be confiscated
+
+This is not a historical exercise. The threat model is current.
+The people who need this today are real.
+
+The system was designed knowing that.
+
+---
+
 ## The stack
 
 ```
@@ -296,7 +327,7 @@ Expected result: legible text.
 | **Start here (implementation)** | [drafts/draft-darley-fds-00.txt](drafts/draft-darley-fds-00.txt) |
 | **Architecture** | [drafts/draft-darley-crowsong-00.txt](drafts/draft-darley-crowsong-00.txt) |
 | **Trust layer** | [drafts/draft-darley-shard-bundle-00.txt](drafts/draft-darley-shard-bundle-00.txt) |
-| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](https://github.com/propertools/meridian-protocol/blob/main/draft-darley-meridian-protocol-01.txt) |
+| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt) |
 | **Design doctrine** | [docs/structural-principles.md](docs/structural-principles.md) |
 | **Full suite overview** | [docs/crowsong-suite-overview.md](docs/crowsong-suite-overview.md) |
 | **Long-horizon physical archival** | [docs/vesper-archive-protocol.md](docs/vesper-archive-protocol.md) |
