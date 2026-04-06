@@ -1,0 +1,408 @@
+WIDTH/3 Binary Encoding
+Section draft for draft-darley-fds-01
+
+T. Darley                                                  Proper Tools SRL
+                                                              April 2026
+
+   This text is a section draft for inclusion in draft-darley-fds-01.
+   It specifies WIDTH/3 Binary Encoding as a new subsection of Section 6
+   (Binary Payload Encoding).  The existing Section 6 text (base64url
+   path) becomes Section 6.1.  This text becomes Section 6.2.
+
+   Amendments to other sections of fds-00 are noted at the end.
+
+
+6.2.  WIDTH/3 Binary Encoding
+
+   WIDTH/3 Binary Encoding provides a direct path for encoding raw byte
+   streams as FDS tokens without an intermediate base64url step.
+
+   Each byte of the input (0x00 through 0xFF) is encoded as a 3-digit
+   zero-padded decimal token (000 through 255).  The output is a
+   standard FDS payload: whitespace-separated tokens, optionally
+   arranged in columns, wrapped in an FDS-FRAME or Print Profile.
+
+   This mode is more bandwidth-efficient than the base64url path
+   (Section 6.1).  base64url expands binary input by approximately 33%
+   before FDS encoding; WIDTH/3 encodes each byte as exactly 3 decimal
+   digits with no intermediary.
+
+   WIDTH/3 Binary Encoding is intended for machine-to-machine binary
+   transfer over FDS-framed channels where human legibility of the
+   framing structure (headers, trailer, column grid) is desired, but
+   human interpretation of individual token values is not required.
+
+   It is NOT RECOMMENDED for Class D channels (human relay).  See
+   Section 6.2.6.
+
+6.2.1.  Encoding Transformation
+
+   Each byte of the input is converted as follows:
+
+      encoded = zero_pad(decimal(byte_value), 3)
+
+   Where byte_value is the unsigned integer value of the byte (0 to
+   255) and zero_pad(n, 3) produces the decimal representation of n
+   padded with leading zeros to width 3.
+
+   Example:
+
+      Byte (hex)   Byte (dec)   Encoded
+      ----------   ----------   -------
+      0x48         72           072
+      0x00         0            000
+      0x65         101          101
+      0xFF         255          255
+
+   Input MUST NOT be NFC-normalised.  Binary mode operates on raw byte
+   streams.  NFC normalisation is a text-mode operation defined in
+   Section 2.1 and does not apply when the BINARY flag is present.
+
+   Column formatting (Section 2.5) MAY be applied.  When column
+   formatting is applied and the final row is incomplete, it MUST be
+   padded with 000 tokens to the declared column width.
+
+   The relationship between padding tokens and the null byte (0x00) is
+   addressed in Section 6.2.2.
+
+6.2.2.  Null Token Semantics in Binary Mode
+
+   In text mode (Section 2.6), the null token (all zeros for the
+   current field width) is RESERVED for row padding and MUST NOT be
+   used to encode semantic content.  The text-mode null-skip rule
+   (Section 2.6) relies on this reservation.
+
+   In BINARY mode, this reservation does not apply.  The token 000
+   is a valid data token representing byte value 0x00.
+
+   The null-skip behaviour defined in Section 2.6 MUST NOT be applied
+   in BINARY mode.  Decoders MUST NOT skip tokens with value 000 when
+   decoding a BINARY frame.
+
+   The boundary between data tokens and padding tokens is determined
+   exclusively by the BYTES count in the trailer (Section 6.2.4).
+   Decoders MUST read exactly the number of tokens declared in the
+   BYTES count, left-to-right, and MUST treat all remaining tokens
+   as padding regardless of their value.
+
+   This is the mechanism that resolves the ambiguity between 0x00 data
+   bytes and 000 padding tokens.
+
+6.2.3.  Header
+
+   The BINARY flag MUST be declared in the FDS-FRAME header:
+
+      ENC: UCS * DEC * COL/6 * PAD/000 * WIDTH/3 * BINARY
+
+   (The asterisk is a rendering placeholder; the actual separator is
+   U+00B7, middle dot, as specified in Section 3.2.)
+
+   Required fields for BINARY frames:
+
+      WIDTH/3     Field width MUST be 3.  This is the only valid field
+                  width for BINARY mode.  Byte values 0-255 require
+                  exactly 3 digits.
+
+      PAD/000     Padding token MUST be 000.
+
+      BINARY      Identifies the frame as carrying a raw byte stream.
+                  MUST be present.  No value; presence is the signal.
+
+   Co-requirement:
+
+      WIDTH/3 and BINARY are mutually dependent.  A frame declaring
+      WIDTH/3 without BINARY is invalid.  A frame declaring BINARY
+      without WIDTH/3 is invalid.  Decoders MUST reject frames that
+      violate this co-requirement.
+
+      Rationale: WIDTH/3 in text mode would support only code points
+      U+0000 through U+03E7 (decimal 0 through 999), a range
+      insufficient for any practical text encoding.  Binding WIDTH/3
+      exclusively to BINARY mode eliminates a class of ambiguity and
+      simplifies parsing: the presence of either field implies the
+      other.
+
+   In Print Profile artifacts (Section 4), the BINARY flag appears on
+   the WIDTH line within the header box:
+
+      +-----------------------------------------+
+      |  REF: <ref>  PAGE <n>/<t>               |
+      |  ENC: UCS * DEC * COL/6 * PAD/000       |
+      |    * WIDTH/3 * BINARY                    |
+      |  MED: <medium>                           |
+      |  DESTROY AFTER READING                   |
+      +-----------------------------------------+
+
+6.2.4.  Trailer
+
+   The trailer for BINARY frames uses BYTES instead of VALUES:
+
+      <n> BYTES * CRC32:<hex> * VERIFY COUNT BEFORE USE
+
+   Where:
+
+      <n>   The exact number of bytes in the original binary input
+         before encoding.  This count includes all bytes, including
+         bytes with value 0x00.
+
+         This differs from the text-mode VALUES count (Section 3.4),
+         which excludes null padding tokens.  The distinction is
+         necessary because 0x00 is valid data in BINARY mode.
+
+      <hex>  The CRC-32 [ISO3309] of the encoded payload string
+         exactly as transmitted, excluding header and trailer lines.
+         This is identical to the text-mode CRC-32 computation
+         (Section 3.4).  The CRC-32 protects the encoded
+         representation, not the original bytes.
+
+   Conditional line:
+
+      IF COUNT FAILS: DESTROY IMMEDIATELY
+
+   Semantics are identical to text mode (Section 3.4).
+
+   Decoders MUST verify the BYTES count before using decoded content.
+   Decoders MUST NOT interpret the BYTES count using VALUES semantics
+   (null-excluding count).
+
+   Example trailer:
+
+      8 BYTES * CRC32:619791BD * VERIFY COUNT BEFORE USE
+      IF COUNT FAILS: DESTROY IMMEDIATELY
+
+6.2.5.  Decoding Rules
+
+   Fully compliant decoders, upon encountering a BINARY frame, MUST:
+
+      1.  Parse and validate the header.  Confirm that both WIDTH/3
+         and BINARY are present.  If either is present without the
+         other, reject the frame.
+
+      2.  Read the BYTES count from the trailer.  Let N be this count.
+
+         BINARY decoding requires the trailer BYTES count before data
+         tokens can be interpreted.  Decoders MUST buffer the complete
+         payload before decoding when column formatting is used.  This
+         is not a new constraint: CRC-32 verification (step 6) already
+         requires the full payload.  The BYTES count makes this
+         requirement load-bearing for correctness, not only integrity.
+
+      3.  Tokenise the payload by splitting on whitespace.
+
+      4.  Read the first N tokens, left-to-right.  For each token:
+
+            a.  Parse as a non-negative integer.
+
+            b.  If the value is outside the range 0 to 255, this is
+               a malformed token.  Handle per Section 8.2.
+
+            c.  Convert the integer to a byte.
+
+            d.  Append the byte to the output stream.
+
+      5.  Discard all tokens beyond position N.  These are padding.
+
+      6.  Verify the CRC-32 over the entire encoded payload string
+         (all tokens, including padding), exactly as received.
+
+      7.  If the BYTES count does not match the number of tokens
+         successfully decoded in step 4, and the frame bears IF COUNT
+         FAILS: DESTROY IMMEDIATELY, discard the decoded content.
+
+   The output of decoding a BINARY frame is a byte stream, not a
+   Unicode text string.  Implementations MUST provide the decoded
+   output as raw bytes.
+
+   If the trailer BYTES count exceeds the total number of non-padding
+   tokens in the payload, this is a malformed frame.  Decoders MUST
+   reject the frame if the DESTROY flag is present.  Decoders MAY
+   attempt partial recovery otherwise by reading all available tokens.
+
+6.2.6.  When to Use WIDTH/3 Binary vs. Base64url
+
+   WIDTH/3 Binary Encoding and the base64url path (Section 6.1) are
+   both valid methods for encoding binary payloads as FDS.  They serve
+   different operational profiles.
+
+      Criterion         B64 Path          WIDTH/3 Binary
+      ---------         --------          --------------
+      Bandwidth         ~33% base64url    3 digits per byte
+                        expansion + FDS   (no intermediary)
+                        expansion
+
+      Decoder needs     base64url decode  WIDTH/3-aware
+                        + FDS decode      FDS decoder only
+
+      Class D           Permitted         NOT PERMITTED
+      (human relay)
+
+      Class A, B        Valid             RECOMMENDED when
+                                          FDS framing desired
+
+   Normative guidance:
+
+      For Class D channels (human relay), the base64url path (Section
+      6.1) MUST be used.  WIDTH/3 Binary Encoding MUST NOT be used on
+      Class D channels.
+
+      Rationale: A human operator transcribing 3-digit byte values has
+      no semantic anchors.  The values 000 through 255 are arbitrary
+      integers that do not correspond to recognisable characters or
+      patterns.  The base64url path, while still difficult for human
+      relay, degrades more gracefully: the larger field width (WIDTH/5)
+      provides a stronger visual rhythm, and errors in the outer FDS
+      layer do not propagate unpredictably into the inner base64url
+      layer.
+
+      For Class A channels (binary-capable) where FDS framing is
+      desired for legibility or integrity, WIDTH/3 Binary Encoding is
+      RECOMMENDED over the base64url path.
+
+      For Class B and C channels, either path is valid.  WIDTH/3 is
+      more bandwidth-efficient.  The base64url path is more compatible
+      with existing toolchains that may not yet support WIDTH/3.
+
+   Complete example:
+
+      Input: 8 bytes (hex): 48 00 65 6C 00 6C 6F 0A
+
+      Decoded interpretation: "H" NUL "el" NUL "lo" LF
+      (Note: contains two 0x00 bytes that must survive encoding.)
+
+      ENC: UCS * DEC * COL/6 * PAD/000 * WIDTH/3 * BINARY
+      072  000  101  108  000  108
+      111  010  000  000  000  000
+      8 BYTES * CRC32:619791BD * VERIFY COUNT BEFORE USE
+      IF COUNT FAILS: DESTROY IMMEDIATELY
+
+      The decoder reads 8 tokens (072 000 101 108 000 108 111 010) and
+      discards the remaining four 000 tokens as padding.  Both 0x00
+      data bytes are preserved.
+
+      Under text-mode VALUES semantics, the count would have been 6
+      (excluding all six 000 tokens — four padding and two data).  The
+      receiver would have no way to recover the two 0x00 data bytes.
+      The BYTES count resolves this.
+
+
+Amendments to Other Sections
+----------------------------
+
+   The following amendments to draft-darley-fds-00 sections are
+   required for consistency with WIDTH/3 Binary Encoding.
+
+Amendment to Section 2.3 (Field Width):
+
+   Add after the paragraph on 7-digit extended field width:
+
+      A 3-digit field width (WIDTH/3) is defined for binary byte-stream
+      encoding (Section 6.2).  WIDTH/3 MUST be used only with the
+      BINARY flag.  WIDTH/3 without BINARY is invalid.
+
+Amendment to Section 3.2 (Header):
+
+   Add to the list of currently defined additional fields:
+
+      BINARY  Indicates that the frame carries a raw byte stream
+         encoded at WIDTH/3 (see Section 6.2).  No value; presence is
+         the signal.  MUST be accompanied by WIDTH/3.  MUST NOT appear
+         without WIDTH/3.
+
+Amendment to Section 3.4 (Trailer):
+
+   Add after the trailer specification:
+
+      When the frame carries BINARY content, the trailer uses BYTES
+      instead of VALUES:
+
+         <n> BYTES * CRC32:<hex> * VERIFY COUNT BEFORE USE
+
+      The BYTES count is the exact number of bytes in the original
+      input, including bytes with value 0x00.  See Section 6.2.4.
+
+      The header and trailer MUST agree on mode.  A frame with a
+      BINARY header and a VALUES trailer, or a non-BINARY header and
+      a BYTES trailer, is malformed.  Decoders MUST reject such
+      frames when the DESTROY flag is present.
+
+Amendment to Section 5 (Authentication):
+
+   Add after the paragraph on signature computation:
+
+      When the frame carries BINARY content, the Ed25519 signature
+      MUST be computed over the decoded byte stream (the exact
+      sequence of N bytes as determined by the BYTES count), with no
+      text normalisation applied.
+
+Amendment to Section 7 (Transport Compatibility Matrix):
+
+   Revise the table to include a WIDTH/3 Binary column:
+
+      Channel   FDS        Text       Binary     Binary       Notes
+      Class     Required   Payload    via B64    via WIDTH/3
+      -------   --------   -------    --------   -----------  -----
+      A         OPTIONAL   Direct     Via B64    Via WIDTH/3  WIDTH/3
+      (binary)                                                preferred
+      B         REQUIRED   Standard   Via B64    Via WIDTH/3  Either
+      (text)                                                  valid
+      C         REQUIRED   Standard   Via B64    Via WIDTH/3  Symbol
+      (symbol)                                                mapping
+                                                              applies
+      D         REQUIRED   Standard   Via B64    NOT          See
+      (human)                                    PERMITTED    6.2.6
+
+Amendment to Section 8.1 (Decoding Rules):
+
+   Revise step 1:
+
+      1.  If a frame header is present, parse and validate it.  Extract
+         field width, column width, padding value, and binary mode
+         flag.  Apply defaults for any absent optional fields.  If the
+         BINARY flag is present, WIDTH MUST be 3; if not, reject the
+         frame.  If WIDTH is 3, BINARY MUST be present; if not, reject
+         the frame.
+
+   Add a binary branch to step 3:
+
+      3.  For each token:
+
+            [TEXT MODE — no BINARY flag]
+
+            a.  Parse as a non-negative integer.
+
+            b.  If the value equals the null token value for the current
+               field width, skip (unless null-preservation mode is
+               active).
+
+            c.  Verify the value is within the valid Unicode range (0 to
+               1114111 / U+10FFFF).  If not, skip.
+
+            d.  Convert the integer to a Unicode code point using
+               chr(value).
+
+            e.  Append the resulting character to the output stream.
+
+            [BINARY MODE — BINARY flag present]
+
+            a.  Read the BYTES count N from the trailer.
+
+            b.  Read the first N tokens, left-to-right.  Do NOT skip
+               null tokens.
+
+            c.  Parse each token as a non-negative integer.  If the
+               value is outside the range 0 to 255, handle per
+               Section 8.2.
+
+            d.  Convert each integer to a byte.  Append to the output
+               byte stream.
+
+            e.  Discard all tokens beyond position N.
+
+Amendment to Section 8.2 (Error Handling):
+
+   Add:
+
+      *  [BINARY MODE] If the trailer BYTES count exceeds the total
+         number of tokens in the payload, this is a malformed frame.
+         Decoders MUST reject the frame if the DESTROY flag is present.
+         Decoders MAY attempt partial recovery otherwise.
