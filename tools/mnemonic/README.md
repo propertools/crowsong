@@ -23,7 +23,8 @@ All seven tools use one prime, two schedules, zero additional key material:
 |------|----------------|-----------------|
 | `prime_twist.py` | CCL base-switching schedule | — |
 | `gloss_twist.py` | (uses prime_twist.py for CCL) | Gloss alphabet permutation |
-| `haiku_twist.py` | Syllable count schedule | Word selection seed |
+| `haiku_twist.py` generate | Syllable count schedule | Word selection seed |
+| `haiku_twist.py` encode-stream | Fisher-Yates corpus permutation (SHA256 of P) | — |
 
 The pattern is the same throughout the stack. Different purposes, same
 construction discipline.
@@ -247,13 +248,22 @@ python symbol_twist.py info    <infile>
 
 ## haiku_twist.py
 
-The Haiku Machine. Generates deterministic, reversible haiku from a
-verse-derived prime. The format eats its own output.
+The Haiku Machine. Two modes:
+
+**generate / chain / verify / decode** — prime-driven haiku generation.
+The verse-derived prime drives syllable count selection and word selection
+within bins. Output is a self-describing haiku artifact. The format eats
+its own output (ouroboros chain).
+
+**encode-stream / decode-stream** — word-space camouflage of arbitrary
+token streams. Any UCS-DEC token stream (e.g. CCL3 output) is encoded as
+real English words structured as repeating 5-7-5 haiku stanzas. Output
+looks like poetry. Reversal is exact.
 
 **Dedicated to Felix 'FX' Lindner (1975–2026).**
 *The signal strains, but never gone.*
 
-### Construction
+### Construction: generate
 
 ```
 verse -> prime P
@@ -269,8 +279,16 @@ seed = SHA256(P_digits_reversed[i mod len(P)] : i : s)
 word = bins[s][seed mod len(bins[s])]
 ```
 
-Syllable count is capped to the remaining syllables in the current line.
-The haiku always lands exactly on the 5-7-5 pattern.
+### Construction: encode-stream
+
+```
+prime P -> SHA256(P) -> Fisher-Yates permutation of corpus (~134k words)
+token value V -> permuted_index[V % corpus_size]
+reversal: word -> position in permuted_index -> token value
+```
+
+The corpus is public. The prime is the secret. Output is structured as
+repeating 5-7-5 stanzas using each word's natural syllable count.
 
 ### The ouroboros
 
@@ -279,9 +297,6 @@ verse₁ → P₁ → haiku₁
 haiku₁ → (as verse) → P₂ → haiku₂
 haiku₂ → P₃ → haiku₃  ...
 ```
-
-Each haiku is simultaneously the output of one prime and the seed for
-the next. The chain is deterministic and infinite.
 
 ### Canonical test vector
 
@@ -301,57 +316,84 @@ Canonical test haiku: `archive/haiku-canonical-001.txt`
 ### Usage
 
 ```bash
-python haiku_twist.py generate [--prime P] [--bins FILE] [--ref ID]
-python haiku_twist.py chain    [--steps N] [--bins FILE] [--output FILE]
-python haiku_twist.py verify   <artifact>  [--bins FILE]
-python haiku_twist.py decode   <artifact>
+# Haiku generation
+python haiku_twist.py --bins FILE generate [--prime P] [--ref ID]
+python haiku_twist.py --bins FILE chain    [--steps N] [--output FILE]
+python haiku_twist.py --bins FILE verify   <artifact>
+python haiku_twist.py         decode       <artifact>
+
+# Word-space stream encoding
+python haiku_twist.py --bins FILE encode-stream [--prime P | --verse FILE] [--ref ID]
+python haiku_twist.py --bins FILE decode-stream <artifact>
 ```
 
-Requires `docs/cmudict/bins.json` (from `tools/cmudict/cmudict.py export`).
+`--bins` is a global flag and must come before the subcommand.
+Default: `docs/cmudict/bins.json`
 
-### Quick start
+### Quick start: haiku generation
 
 ```bash
-# Build syllable bins (one-time)
 python tools/cmudict/cmudict.py fetch
 python tools/cmudict/cmudict.py export
 
-# Generate canonical test vector
 echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
-    python haiku_twist.py generate --bins docs/cmudict/bins.json --ref HAIKU-K1 \
+    python haiku_twist.py --bins docs/cmudict/bins.json generate --ref HAIKU-K1 \
     > archive/haiku-canonical-001.txt
 
-# Verify
-python haiku_twist.py verify archive/haiku-canonical-001.txt \
-    --bins docs/cmudict/bins.json
+python haiku_twist.py --bins docs/cmudict/bins.json \
+    verify archive/haiku-canonical-001.txt
 
-# Chain: 7 linked haiku (ouroboros)
 echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
-    python haiku_twist.py chain --bins docs/cmudict/bins.json \
-        --steps 7 --output archive/haiku-chain-001.txt
+    python haiku_twist.py --bins docs/cmudict/bins.json chain --steps 7
 ```
 
-### Artifact format
+### Full pipeline: arbitrary text → haiku poetry → back
 
+```bash
+# Encode
+cat archive/second-law-blues.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python tools/mnemonic/prime_twist.py stack \
+        --verse-file verses.txt --no-symbol-check --ref CCL3 \
+    | python tools/mnemonic/haiku_twist.py --bins docs/cmudict/bins.json \
+        encode-stream --verse verses.txt --ref STREAM-001 \
+    > archive/second-law-blues-haiku.txt
+
+# Decode
+python tools/mnemonic/haiku_twist.py --bins docs/cmudict/bins.json \
+    decode-stream archive/second-law-blues-haiku.txt \
+    | python tools/mnemonic/prime_twist.py unstack - \
+    | python tools/ucs-dec/ucs_dec_tool.py --decode
+```
+
+### Artifact formats
+
+**haiku-twist** (generate):
 ```
 RSRC: BEGIN
   TYPE:         haiku-twist
-  VERSION:      1
+  PRIME:        11527664883411634260504727650961...
   CORPUS:       bins.json
   PATTERN:      5-7-5
-  SCHEDULE:     forward=syl(d mod 5 + 1), reversed=word-select(SHA256)
-  WORDS:        13
-  PRIME:        11527664883411634260504727650961...
   SYLLABLES:    2 3 1 2 2 3 1 2 2 1 2 2 1
   WORD-INDEX:   2:1847 3:4201 1:892 ...
-  GENERATED:    2026-04-06
   DEDICATION:   Dedicated to Felix 'FX' Lindner (1975-2026).
-  VERSE:        Factoring primes in the hot sun, I fought Entropy...
 RSRC: END
 ```
 
-The RSRC block carries the full generation trace. Deterministic reversal
-requires: prime, corpus (`bins.json`), syllable plan, word indices.
+**haiku-stream** (encode-stream):
+```
+RSRC: BEGIN
+  TYPE:         haiku-stream
+  PRIME:        11527664883411634260504727650961...
+  CORPUS:       bins.json
+  CORPUS-SIZE:  134212
+  ENCODING:     keyed-permutation / Fisher-Yates / SHA256(P)
+  TOKENS:       534
+  CRC32-TOKENS: E8DC9BF3
+  DEDICATION:   Dedicated to Felix 'FX' Lindner (1975-2026).
+RSRC: END
+```
 
 ---
 
@@ -410,22 +452,26 @@ verse (any length, any Unicode)
     │
     ├─ forward digits of P
     │   ├─ CCL key schedule          ← prime_twist.py
-    │   └─ Syllable count schedule   ← haiku_twist.py
+    │   └─ Syllable count schedule   ← haiku_twist.py generate
     │
     └─ reversed digits of P
         ├─ Gloss alphabet permutation  ← gloss_twist.py
-        └─ Word selection seed         ← haiku_twist.py
+        └─ Word selection seed         ← haiku_twist.py generate
+
+    SHA256(P) → Fisher-Yates corpus permutation ← haiku_twist.py encode-stream
+        token value V → permuted_index[V % corpus_size]
 
 
 Encoding pipeline (FDS):
-    [optional] gloss_twist.py   — base-52 pre-encoding (non-Latin scripts)
-    [optional] symbol_twist.py  — script fingerprint camouflage
-    prime_twist.py              — CCL base-switching
+    [optional] gloss_twist.py    — base-52 pre-encoding (non-Latin scripts)
+    [optional] symbol_twist.py   — script fingerprint camouflage
+    prime_twist.py               — CCL base-switching
+    [optional] haiku_twist.py    — word-space camouflage (encode-stream)
     → self-describing artifact with RSRC block
 
-Haiku pipeline:
-    haiku_twist.py generate     — 5-7-5 from prime + cmudict bins
-    haiku_twist.py chain        — ouroboros chain, N steps
+Haiku generation pipeline:
+    haiku_twist.py generate      — 5-7-5 from prime + cmudict bins
+    haiku_twist.py chain         — ouroboros chain, N steps
     → self-describing artifact with RSRC block
 ```
 
