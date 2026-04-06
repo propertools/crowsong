@@ -79,7 +79,11 @@ draft-darley-crowsong-00
   ↑ composes
 draft-darley-fds-00           draft-darley-shard-bundle-00
   ↑ implements                  ↑ implements
-tools/ucs-dec/ucs_dec_tool.py
+tools/ucs-dec/ucs_dec_tool.py tools/mnemonic/
+
+draft-darley-fds-ccl-prime-twist-00   (pre-normative)
+  ↑ specifies
+tools/mnemonic/prime_twist.py
 ```
 
 | Draft | Description |
@@ -88,6 +92,7 @@ tools/ucs-dec/ucs_dec_tool.py
 | `draft-darley-shard-bundle-00` | Trust — threshold key distribution |
 | `draft-darley-crowsong-00` | Architecture — how the system composes |
 | `draft-darley-meridian-protocol-01` | Content — continuity of web artifacts |
+| `draft-darley-fds-ccl-prime-twist-00` | Channel Camouflage Layer *(pre-normative)* |
 
 ---
 
@@ -102,9 +107,13 @@ tools/primes/                 Miller-Rabin primality testing
 tools/constants/              named mathematical constant digit generator
 tools/sequences/              OEIS sequence mirror
 tools/mnemonic/               verse-to-prime derivation and CCL prime-twist
+tools/texts/                  Project Gutenberg canonical text mirror
+tools/git/                    git bundle tool for FDS payload packaging
 docs/                         supporting material and guides
 docs/constants/               pre-generated constant digit files (10,000 digits each)
 docs/sequences/               cached OEIS sequences
+docs/texts/                   cached canonical texts (42 texts, 16 regions)
+docs/quickref/                pre-generated Unicode quick reference cards
 archive/                      canonical test vectors
 tests/roundtrip/              verification scripts
 demo/                         runnable demonstrations
@@ -335,6 +344,9 @@ Expected result: legible text.
 | **Mobile app architecture** | [docs/crowsong-mobile-architecture.md](docs/crowsong-mobile-architecture.md) |
 | **Mnemonic key wrapping and CCL** | [docs/mnemonic-shamir-sketch.md](docs/mnemonic-shamir-sketch.md) |
 | **CCL full capability demo** | [demo/ccl_demo.sh](demo/ccl_demo.sh) |
+| **Canonical text corpus** | [tools/texts/README.md](tools/texts/README.md) |
+| **Threat model** | [THREAT-MODEL.md](THREAT-MODEL.md) |
+| **Regulatory status** | [EU_DECLARATION_OF_CONFORMITY.md](EU_DECLARATION_OF_CONFORMITY.md) |
 | **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |
 
 ---
