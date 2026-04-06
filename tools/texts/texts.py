@@ -390,6 +390,7 @@ TEXTS = {
     },
     "wittgenstein-tractatus": {
         "gutenberg_id": 5740,
+        "url":          "https://www.gutenberg.org/files/5740/5740.txt",
         "title":        "Tractatus Logico-Philosophicus",
         "author":       "Ludwig Wittgenstein",
         "language":     "en",
