@@ -79,6 +79,11 @@ BLOCKS = [
     (0x1F680,0x1F6FF,"Transport and Map Symbols",["emoji","crowsong"]),
     (0x1F900,0x1F9FF,"Supplemental Symbols and Pictographs",["emoji","crowsong"]),
     (0x1FA70,0x1FAFF,"Symbols and Pictographs Extended-A",["emoji"]),
+    (0x2E00,0x2E7F,"Supplemental Punctuation",["symbol","deepcut","vesper"]),
+    (0x2440,0x245F,"Optical Character Recognition",["symbol","deepcut"]),
+    (0x1F700,0x1F77F,"Alchemical Symbols",["symbol","deepcut"]),
+    (0x2C80,0x2CFF,"Coptic",["deepcut","vesper"]),
+    (0x10140,0x1018F,"Ancient Greek Numbers",["deepcut","math"]),
 ]
 
 PRESETS = {
@@ -96,6 +101,8 @@ PRESETS = {
                  "tags":["european","latin"],"grid":True,"proc":False},
     "cjk":      {"title":"FDS CJK Reference",
                  "tags":["east-asian"],"grid":False,"proc":False},
+    "deepcut":  {"title":"FDS Deep Cut — Symbols Worth Reviving",
+                 "tags":["deepcut","symbol","math"],"grid":False,"proc":True},
 }
 
 LW = 72
