@@ -1,6 +1,6 @@
 # tools/mnemonic/ — verse-derived keys and Channel Camouflage Layer
 
-Three files sharing a common construction:
+Six files sharing a common construction:
 
 ```
 verse
@@ -14,14 +14,18 @@ verse
 
 `mnemonic.py` is the shared library that owns this construction — the
 single canonical implementation of primality testing, prime derivation,
-and verse-to-prime. It is imported by the other two tools; neither
-duplicates the construction logic.
+and verse-to-prime. It is imported by the other tools; none duplicate
+the construction logic.
 
 `verse_to_prime.py` derives the prime and packages it as a self-describing
 FDS Print Profile artifact. `prime_twist.py` uses a prime as a cyclic key
 schedule to apply base-switching transforms to any FDS token stream.
+`gloss_twist.py` applies a key-derived base-52 pre-encoding for non-Latin
+scripts. `symbol_twist.py` applies a key-derived bijection for script
+fingerprint camouflage. `crowsong-advisor.py` reads a UCS-DEC token stream
+and recommends the optimal pipeline.
 
-All three: Python 2.7+/3.x, no external dependencies, MIT licence.
+All six: Python 2.7+/3.x, no external dependencies, MIT licence.
 
 **These are test implementations.** The CCL construction and artifact
 format are not yet normatively specified. See
@@ -199,6 +203,9 @@ Maximum depth: 10. Diminishing returns beyond CCL3:
 CCL3 exceeds the AES-128 ciphertext entropy reference. A passive
 entropy scanner cannot distinguish it from encrypted data.
 
+For non-Latin scripts, apply the Gloss layer before CCL — see
+`gloss_twist.py` below.
+
 ### Steganographic injection
 
 The twisted token stream consists of five-digit decimal integers.
@@ -208,6 +215,140 @@ without modification. The receiver extracts the numeric field and pipes
 it to `unstack`.
 
 See `demo/ccl_demo.sh` for a full nine-step live demonstration.
+
+---
+
+## gloss_twist.py
+
+The Gloss layer. Applies a key-derived base-52 pre-encoding to FDS token
+streams before CCL. Designed for Arabic, CJK, Hangul, Hebrew, Devanagari,
+Thai, and any script with code points above roughly U+0800 — scripts where
+CCL's feasibility rule (base^WIDTH > token_value) structurally limits twist
+rate and entropy gain.
+
+**The problem:** For a CJK token at value 30,000, only bases 8 and 9 pass
+the feasibility check. Twist rate is capped at ~22% per pass regardless of
+the key schedule. Three passes of CCL add little.
+
+**The construction:** Re-encode each token value in base 52 (A–Z a–z),
+producing three output tokens per input. Output code points fall in the
+ASCII letter range (65–122), where all CCL bases 3–9 are feasible on
+every token.
+
+**Key derivation:** The Gloss alphabet permutation is seeded from
+SHA256 of the **reversed** digit sequence of the prime. This produces
+a second independent schedule from the same prime — one prime, two
+schedules, zero additional key material. 78% of digit positions differ
+between the forward (CCL) and reversed (Gloss) schedules.
+
+**Entropy gain (3-pass CCL):**
+
+| Script | CCL3 alone | Gloss + CCL3 | Gain |
+|--------|-----------|--------------|------|
+| Chinese | 5.93 | **7.29** | +1.36 bits/token |
+| Korean | 6.17 | **7.47** | +1.30 |
+| Japanese | 6.11 | **7.24** | +1.13 |
+| Arabic | 6.40 | **7.05** | +0.65 |
+| Hebrew | 6.40 | **7.02** | +0.62 |
+| Hindi | 6.61 | **7.09** | +0.48 |
+| Russian | 6.83 | **7.28** | +0.45 |
+| English | 8.16 | 7.56 | −0.60 (CCL alone preferred) |
+
+AES-128 reference: ~7.95 bits/byte.
+
+```bash
+python gloss_twist.py gloss   [--prime P | --verse-file F] [--ref ID]
+python gloss_twist.py ungloss <infile>
+python gloss_twist.py info    <infile>
+```
+
+### Example pipeline (Arabic)
+
+```bash
+# Fetch UDHR Arabic and extract text
+python tools/udhr/udhr.py extract arz
+
+# Encode, gloss, twist, analyse
+cat docs/udhr/Arabic/arz_Arabic.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python gloss_twist.py gloss --verse-file verses.txt \
+    | python prime_twist.py stack --verse-file verses.txt --ref CCL3 \
+    > arabic_ccl3.txt
+
+# Or let the advisor choose for you
+cat docs/udhr/Arabic/arz_Arabic.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python crowsong-advisor.py
+```
+
+Round-trip verified. See `docs/mnemonic/gloss-README.md` for the full
+design rationale and construction details.
+
+---
+
+## symbol_twist.py
+
+The Symbol layer. Applies a key-derived bijection over 62,584 eligible
+Unicode code points to the FDS token value distribution. Primary purpose:
+destroy script fingerprints before CCL runs.
+
+**The threat:** UCS-DEC token value distributions leak script identity.
+Arabic clusters at 01536–01791. CJK at 19968–40959. A passive observer
+can identify the script — language, likely origin, subject matter — from
+traffic analysis alone, before CCL is applied.
+
+**The construction:** Keyed Fisher-Yates shuffle of 62,584 eligible Unicode
+code points, seeded from SHA256(P). Each token value V maps to
+`shuffled_candidates[V]`. 1:1 bijection — no expansion.
+
+**Distinct from the Gloss layer:**
+
+| Layer | Purpose |
+|-------|---------|
+| Gloss | Entropy tool — restores CCL feasibility for high-codepoint scripts |
+| Symbol | Camouflage tool — masks script fingerprints in the token distribution |
+
+```bash
+python symbol_twist.py twist   [--prime P | --verse-file F] [--ref ID]
+python symbol_twist.py untwist <infile>
+```
+
+---
+
+## crowsong-advisor.py
+
+Pipeline recommendation tool. Reads a UCS-DEC token stream on stdin,
+evaluates all available pipeline modes, and outputs a ranked list from
+highest to lowest predicted output entropy with copy-paste bash pipelines.
+
+```bash
+cat payload.txt | python crowsong-advisor.py
+cat payload.txt | python crowsong-advisor.py --analyse
+cat payload.txt | python crowsong-advisor.py --analyse --json | jq .
+cat payload.txt | python crowsong-advisor.py --quiet
+```
+
+**Modes evaluated:**
+
+1. CCL3 (standard schedule)
+2. CCL3 (mod3 schedule)
+3. Gloss + CCL3
+4. Symbol + CCL3
+5. Gloss + CCL3 (mod3)
+
+For English, CCL3 standard wins. For Chinese, Gloss + CCL3 wins. The
+advisor knows the difference and says so.
+
+**`--analyse` flag:** Full statistical analysis of the input:
+- Shannon entropy H₀ ±σ with visual bar graph
+- Unicode script distribution (50+ blocks) with % bars
+- CCL feasibility profile per base 2–9 with interpretation
+- Token value statistics (min/max/mean/median/mode)
+- Top 15 most frequent tokens decoded to characters
+- ⚠ warning when most CCL bases are infeasible (Gloss recommended)
+
+Output formats: human-readable (default), `--quiet` (table),
+`--json` (pipeable to jq).
 
 ---
 
@@ -224,22 +365,35 @@ verse (any length, any Unicode)
     ▼ SHA256 of token stream (UTF-8)
     │   → 256-bit digest → ~77-digit integer N
     │
-    ▼ next_prime(N)        ← mnemonic.py boundary
-    │   prime P (77 digits)  (verse_to_prime.py packages the artifact)
+    ▼ next_prime(N)              ← mnemonic.py boundary
+    │   prime P (77 digits)        (verse_to_prime.py packages the artifact)
     │
-    ▼ use digits of P as key schedule (ouroboros)
+    ├─ forward digits of P  →  CCL key schedule (ouroboros)   ← prime_twist.py
     │
-    ▼ for each FDS token tᵢ:       ← prime_twist.py
-    │   digit d = P_digits[i mod len(P)]
-    │   base  b = d  if d ≥ 2 and b^width > tᵢ
-    │           = 10 otherwise (fallback)
-    │   output  = repr(tᵢ, base=b, width=5)
-    │   record  twist_map[i] = b
+    └─ reversed digits of P →  Gloss alphabet permutation     ← gloss_twist.py
+    │
+    ▼ [optional] gloss_twist.py — base-52 pre-encoding
+    │   for Arabic/CJK/Hangul/Hebrew/Devanagari/Thai
+    │   output: ASCII letter range (65-122), all CCL bases feasible
+    │
+    ▼ [optional] symbol_twist.py — script fingerprint masking
+    │   bijection over 62,584 eligible code points
+    │
+    ▼ prime_twist.py — CCL base-switching
+    │   for each FDS token tᵢ:
+    │     digit d = P_digits[i mod len(P)]
+    │     base  b = d  if d ≥ 2 and b^width > tᵢ
+    │             = 10 otherwise (fallback)
+    │     output  = repr(tᵢ, base=b, width=5)
+    │     record  twist_map[i] = b
     │
     ▼ twisted FDS token stream
         + RSRC block with PRIME and TWIST-MAP
         → self-describing artifact
 ```
+
+Use `crowsong-advisor.py` to determine which optional layers to apply
+for a given input.
 
 ---
 
@@ -248,7 +402,9 @@ verse (any length, any Unicode)
 | Tool | Purpose |
 |------|---------|
 | `tools/mnemonic/mnemonic.py` | Shared library: primality, verse-to-prime construction |
+| `tools/mnemonic/crowsong-advisor.py` | Pipeline advisor with statistical analysis |
 | `tools/ucs-dec/ucs_dec_tool.py` | FDS encode / decode / frame / verify |
+| `tools/udhr/udhr.py` | UDHR multilingual corpus (37 languages, 20 scripts) |
 | `tools/primes/primes.py` | Primality testing and prime generation |
 | `tools/constants/constants.py` | Named constant digit generation (IV sources) |
 | `tools/sequences/sequences.py` | OEIS sequence mirror |
@@ -258,7 +414,10 @@ verse (any length, any Unicode)
 
 | Document | Notes |
 |----------|-------|
-| `drafts/draft-darley-fds-ccl-prime-twist-00.txt` | Pre-normative CCL spec |
+| `drafts/draft-darley-fds-ccl-prime-twist-00.txt` | Pre-normative CCL spec, including §8.5 per-script entropy results |
+| `docs/mnemonic/gloss-README.md` | Gloss layer design rationale and construction |
+| `docs/entropy-analysis.md` | Shannon entropy measurements across 20+ languages |
+| `docs/operator-worked-example.md` | Complete encode/camouflage/reveal by hand |
 | `docs/mnemonic-shamir-sketch.md` | Mnemonic Share Wrapping design sketch |
 | `docs/structural-principles.md` | Governing design principles |
 | `demo/ccl_demo.sh` | Nine-step live demonstration |
@@ -266,7 +425,7 @@ verse (any length, any Unicode)
 ## Compatibility
 
 Python 2.7+ / 3.x. No external dependencies.
-`prime_twist.py` and `verse_to_prime.py` import from `mnemonic.py` in the same directory.
+All tools import from `mnemonic.py` in the same directory.
 
 ## Licence
 
