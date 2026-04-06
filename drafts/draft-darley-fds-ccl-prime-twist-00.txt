@@ -69,7 +69,50 @@ Table of Contents
      3.3.  What CCL Does Not Provide
    4.  The Prime-Twist Construction
      4.1.  Overview
-     4.2.  Key Schedule: Prime Digit Sequence
+     4.1.1.  Construction Diagram
+
+   The following diagram illustrates the prime-twist construction for a
+   single pass.  The prime digit sequence cycles (the ouroboros); one
+   digit is consumed per token.
+
+   Key prime P (77 digits, cycles -- the ouroboros):
+   +---+---+---+---+---+---+---+---+-- ... --+
+   | 1 | 1 | 1 | 0 | 5 | 6 | 6 | 5 |         |--.
+   +---+---+---+---+---+---+---+---+-- ... --+  |
+     |   |   |   |   |   |   |   |               |
+     '---'---'---'---'---'---'---'   (i mod len(P)) <--'
+
+   For each token i:
+
+   (1) d = P_digits[i mod len(P)]      <-- scheduled digit
+
+   (2) Schedule:
+       .-----------------------------.  .----------------------------.
+       |        standard             |  |          mod3              |
+       |  d <= 1  -->  base 10       |  |  7 + (d mod 3)            |
+       |  d 2-9   -->  base d        |  |  always base 7, 8, or 9   |
+       '-----------------------------'  '----------------------------'
+
+   (3) Feasibility rule (both schedules):
+       if base^WIDTH <= token_value  -->  fall back to base 10
+       else                          -->  use scheduled base
+
+   (4) Actual base b in {2, 3, 4, 5, 6, 7, 8, 9, 10}
+
+   (5) Output token: repr(token_value, base=b, width=WIDTH)
+       e.g. value 65, base 8, WIDTH/5  -->  "00101"
+
+   (6) Record: twist_map[i] = b
+       Sparse encoding: only non-base-10 entries stored.
+       "3:5,7:8,12:9,..."  (position:base)
+
+   NOTE: The twist-map is authoritative for reversal.  The receiver
+   MUST use the recorded twist-map and MUST NOT re-derive touched
+   positions from the prime during reversal.  The schedule field
+   describes the generation profile only.
+
+
+4.2.  Key Schedule: Prime Digit Sequence
      4.3.  Base Selection
      4.4.  Token Encoding
      4.5.  Twist-Map
@@ -743,11 +786,56 @@ Table of Contents
       the achievable entropy is bounded by the input distribution, not
       the token space.
 
-      OPEN QUESTION: Should WIDTH/3 BINARY mode define a distinct CCL
-      base schedule (mod3 or equivalent), or should implementations
-      derive the schedule from the standard construction with a declared
-      WIDTH/3-specific parameter?  This decision gates normative
-      specification of WIDTH/3 CCL.
+      RESOLUTION (working consensus, April 2026):
+
+      Named schedule enumeration is the correct approach.  Each schedule
+      is defined normatively as a profile over a shared conceptual model:
+
+         candidate-base function f(digit)  --  maps each prime digit to
+                                               a candidate base
+         generic feasibility rule          --  if base^WIDTH <= token_value,
+                                               use base 10; else use
+                                               candidate base
+         authoritative twist-map           --  records actual base used
+                                               per position; used for
+                                               reversal, not the schedule
+
+      The schedule field in the artifact describes the generation profile.
+      It is not needed for reversal.  Receivers MUST treat the twist-map
+      as authoritative and MUST NOT attempt to reconstruct actual bases
+      from the schedule field alone.
+
+      Current named schedules:
+
+         standard:  candidate_base(d) = 10 if d <= 1, else d
+                    Feasibility fallback: implicit, global.
+                    Appropriate for WIDTH/5 natural language payloads.
+
+         mod3:      candidate_base(d) = 7 + (d mod 3)
+                    Always base 7, 8, or 9.
+                    No feasibility fallback at WIDTH/3 (7^3 = 343 > 255).
+                    Appropriate for WIDTH/3 BINARY payloads.
+
+      The feasibility fallback is implicit and global for all schedules.
+      It is a representation constraint, not a schedule parameter.  No
+      FALLBACK field is required in artifacts.
+
+      Parameterisation is deferred.  A literal mapping syntax
+      (SCHEDULE: cycle/7,8,9) is the candidate if a third validated use
+      case requires it.  New named schedules are added by extending the
+      enumeration, not by adding syntax.
+
+      Normative formulation:
+
+         A CCL schedule defines a candidate base for each key-schedule
+         digit; the actual base used is determined by the generic
+         feasibility rule, with base 10 used whenever the candidate base
+         cannot represent the token value within the declared WIDTH.
+         The twist-map is authoritative for reversal.
+
+      This resolution gates normative specification of WIDTH/3 CCL.
+      Implementation of the mod3 schedule is complete in the reference
+      implementation (--schedule mod3 in prime_twist.py).
 
    11.5.  Feasibility fallback semantics under stacking
 
