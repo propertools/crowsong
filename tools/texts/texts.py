@@ -546,7 +546,11 @@ def _strip_gutenberg_header_footer(text):
             end = idx
             break
 
-    return text[start:end].strip()
+    # Normalise line endings before returning — Gutenberg files often use
+    # CRLF. Python's open(..., "r") normalises CRLF->LF on read, so we
+    # must normalise here too, otherwise the SHA256 computed at write time
+    # won't match the SHA256 computed at verify time.
+    return text[start:end].replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 # ── File format ───────────────────────────────────────────────────────────────
