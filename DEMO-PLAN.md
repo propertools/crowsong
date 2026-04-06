@@ -234,6 +234,77 @@ over the same channel, or even in the same country.
 
 ---
 
+## The quine — self-hosting release artifact
+
+The `-01` release tag ceremony:
+
+The Crowsong repository, at the `-01` tag, is packaged as a UCS-DEC
+artifact using the tools it contains. The artifact is committed to the
+repository. The repository contains the tools to decode the artifact.
+The artifact contains the tools to verify the artifact.
+
+```
+git bundle create crowsong-01.bundle v0.1-crowsong-01
+  → WIDTH/3 BINARY encode
+  → CCL3 (mod3 schedule, optional)
+  → FDS-FRAME  TYPE: git-bundle  REF: crowsong-01
+  → crowsong-01-release.txt
+  → committed to the repo at the -01 tag
+```
+
+This is a quine. The system eats its own tail.
+
+**Why this matters:**
+
+This is the "fax a firmware update" scenario made concrete. The
+firmware *is* the repo. The repo contains the tools to decode the
+firmware. A receiver with nothing but the artifact and a Python
+interpreter has a working Crowsong system that can decode the next
+artifact it receives.
+
+Class D channel. Zero infrastructure. Self-bootstrapping.
+
+The artifact is the proof of concept for the entire stack in one
+operation:
+
+- Human-operable encoding ✓ (UCS-DEC)
+- Statistical camouflage ✓ (CCL3, optional)
+- Self-describing ✓ (RSRC block, TYPE: git-bundle)
+- Integrity-verified ✓ (CRC32 in trailer)
+- Self-hosting ✓ (the tools decode themselves)
+- Transmissible over any channel ✓ (fax, Morse, print, microdot)
+
+**The tag ceremony:**
+
+```bash
+# At -01 tag time:
+git bundle create crowsong-01.bundle v0.1-crowsong-01
+python tools/git/gitbundle.py verify crowsong-01.bundle
+python tools/ucs-dec/ucs_dec_tool.py --encode-binary crowsong-01.bundle     --frame --ref crowsong-01     > archive/crowsong-01-release.txt
+python tools/ucs-dec/ucs_dec_tool.py -v     < archive/crowsong-01-release.txt
+git add archive/crowsong-01-release.txt
+git commit -m "chore: the system eats its own tail
+
+531 VALUES · CRC32:<hash> · SIGNAL SURVIVES"
+git tag v0.1-crowsong-01
+```
+
+**The Wikipedia extension:**
+
+The same construction applies to any web artifact. HTML in the data
+fork, CSS/images/JS as binary payloads in the resource fork, WIDTH/3
+BINARY encoded. A receiver with a browser and the decode tools renders
+a web page from a self-describing artifact with no network connection.
+
+The Meridian Protocol made concrete: here is a web page that survived.
+The artifact is the preservation unit.
+
+**Status:** planned for the -01 tag ceremony. Depends on WIDTH/3
+BINARY mode in `ucs_dec_tool.py` and `tools/git/gitbundle.py`.
+Both are in-scope for the release.
+
+---
+
 ## Deferred
 
 Full fax page profile (alignment marks, Reed-Solomon) is far-horizon work.
