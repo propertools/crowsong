@@ -700,8 +700,14 @@ Table of Contents
       -----              --------------
       Shamir             Threshold security
       Mnemonic wrapping  Human recovery of key material
+      Gloss              Script-fingerprint masking; CCL feasibility
+                         restoration for high-codepoint scripts
       CCL                Visual/statistical camouflage
       FDS                Transport encoding
+
+   The Gloss Layer (tools/mnemonic/gloss_twist.py) is applied between
+   Mnemonic wrapping and CCL when the payload contains scripts with code
+   points above U+0800.  It is a pre-normative implementation.
 
    No layer depends on another for its correctness or for preserving its
    security guarantees.  CCL MAY be applied without Shamir or mnemonic
