@@ -14,6 +14,7 @@ Exports:
     next_prime(n)       Smallest prime >= n
     ucs_dec_encode(text, width)   UCS-DEC token stream encoder
     derive(verse, width)          Full verse-to-prime construction
+    derive_from_bytes(raw_bytes)  Binary-seed to prime (possession-based)
 
 Construction:
 
@@ -182,6 +183,60 @@ def derive(verse, width=5):
         "P":            P,
         "width":        width,
     }
+
+# ── Binary-seed derivation (possession-based) ────────────────────────────────
+
+def derive_from_bytes(raw_bytes):
+    """
+    Derive a prime from a binary seed.
+
+    This is a possession-based key derivation: the operator must possess
+    the exact binary artifact (image, audio, document, ...) to reconstruct
+    the prime.  It is NOT a mnemonic — there is nothing to memorise.
+
+    Construction:
+
+        raw bytes  (any binary blob)
+          -> SHA256(raw_bytes)
+          -> interpret digest as 256-bit integer N
+          -> next_prime(N)
+          -> prime P
+
+    No NFC normalisation.  No UCS-DEC encoding.  Bytes are bytes.
+
+    Args:
+        raw_bytes: the binary seed material (bytes).
+                   Must not be empty.
+
+    Returns:
+        dict with keys:
+            canonical   (bytes) the raw bytes hashed (identity)
+            digest_hex  (str)   SHA256 hex digest
+            N           (int)   integer interpretation of digest
+            P           (int)   derived prime
+
+    Raises:
+        TypeError  if raw_bytes is not bytes
+        ValueError if raw_bytes is empty
+    """
+    if not isinstance(raw_bytes, bytes):
+        raise TypeError(
+            "raw_bytes must be bytes, got {0!r}".format(
+                type(raw_bytes).__name__))
+    if len(raw_bytes) == 0:
+        raise ValueError("raw_bytes must not be empty")
+
+    digest_hex = hashlib.sha256(raw_bytes).hexdigest()
+    N = int(digest_hex, 16)
+    P = next_prime(N)
+
+    return {
+        "canonical":  raw_bytes,
+        "digest_hex": digest_hex,
+        "N":          N,
+        "P":          P,
+    }
+
 
 # ── Melody derivation ─────────────────────────────────────────────────────────
 
