@@ -47,24 +47,27 @@ import sys
 import unicodedata
 
 UNICODE_MAX  = 0x10FFFF
+BYTE_MAX     = 255
 BOX_INNER    = 41         # interior width of Print Profile box
 MIDDLE_DOT   = "\u00b7"   # U+00B7, the FDS field separator
 DESTROY_FLAG = "IF COUNT FAILS: DESTROY IMMEDIATELY"
 
 # Regex for the ENC: header line (inside or outside a box border)
+# Captures: (1) COL, (2) PAD, (3) WIDTH, (4) BINARY flag
 _ENC_RE = re.compile(
     r"ENC:\s+UCS\s*[" + MIDDLE_DOT + r"\*\xb7]\s*DEC"
     r"(?:\s*[" + MIDDLE_DOT + r"\*\xb7]\s*COL/(\d+))?"
     r"(?:\s*[" + MIDDLE_DOT + r"\*\xb7]\s*PAD/(\w+))?"
     r"(?:\s*[" + MIDDLE_DOT + r"\*\xb7]\s*WIDTH/(\d+))?"
+    r"(?:\s*[" + MIDDLE_DOT + r"\*\xb7]\s*(BINARY))?"
 )
 
 # Regex for WIDTH/N appearing on its own line (Print Profile splits it)
 _WIDTH_RE = re.compile(r"\bWIDTH/(\d+)\b")
 
-# Regex for the trailer line
+# Regex for the trailer line (matches both VALUES and BYTES)
 _TRAILER_RE = re.compile(
-    r"(\d+)\s+VALUES?\s*[" + MIDDLE_DOT + r"\*\xb7\s]\s*CRC32:([0-9A-Fa-f]+)"
+    r"(\d+)\s+(VALUES?|BYTES)\s*[" + MIDDLE_DOT + r"\*\xb7\s]\s*CRC32:([0-9A-Fa-f]+)"
 )
 
 PY2 = (sys.version_info[0] == 2)
@@ -98,6 +101,21 @@ def _write_stdout(text):
             sys.stdout.write(text)
     else:
         sys.stdout.write(text)
+
+
+def _read_stdin_bytes():
+    """Read stdin as raw bytes."""
+    if PY2:
+        return sys.stdin.read()
+    return sys.stdin.buffer.read()
+
+
+def _write_stdout_bytes(data):
+    """Write raw bytes to stdout."""
+    if PY2:
+        sys.stdout.write(data)
+    else:
+        sys.stdout.buffer.write(data)
 
 
 # ── Token helpers ─────────────────────────────────────────────────────────────
@@ -173,9 +191,11 @@ def parse_frame(text):
         "width":          5,
         "cols":           6,
         "pad_token":      None,
+        "binary":         False,
         "payload_str":    "",
         "trailer_found":  False,
         "declared_count": None,
+        "trailer_keyword": None,
         "declared_crc":   None,
         "destroy_flag":   False,
         "sig_line":       None,
@@ -197,6 +217,8 @@ def parse_frame(text):
                 result["pad_token"] = m.group(2)
             if m.group(3) is not None:
                 result["width"] = int(m.group(3))
+            if m.group(4) is not None:
+                result["binary"] = True
             continue
 
         if header_seen and not result["payload_str"] and not payload_lines:
@@ -205,6 +227,8 @@ def parse_frame(text):
                 result["width"] = int(mw.group(1))
                 if result["pad_token"] is None:
                     result["pad_token"] = "0" * result["width"]
+                if "BINARY" in clean:
+                    result["binary"] = True
                 continue
 
         if header_seen and clean.startswith("SIG:") and not payload_lines:
@@ -218,7 +242,8 @@ def parse_frame(text):
         if mt:
             result["trailer_found"] = True
             result["declared_count"] = int(mt.group(1))
-            result["declared_crc"] = mt.group(2).upper()
+            result["trailer_keyword"] = mt.group(2).upper()
+            result["declared_crc"] = mt.group(3).upper()
             continue
 
         if header_seen and _is_payload_line(line):
@@ -235,6 +260,16 @@ def verify_frame(parsed):
     """
     Verify count and CRC32 of a parsed frame.
 
+    Count semantics are determined by the trailer keyword, not the
+    header flag:
+      - VALUES trailer: count excludes null padding tokens.
+      - BYTES trailer: count is exact original byte count; verified
+        by checking the payload has at least that many tokens.
+
+    Co-requirement enforcement: BINARY header with VALUES trailer, or
+    non-BINARY header with BYTES trailer, is a malformed frame and
+    fails the count check.
+
     Args:
         parsed: dict returned by parse_frame()
 
@@ -248,13 +283,37 @@ def verify_frame(parsed):
     pad = parsed["pad_token"]
     payload = parsed["payload_str"].strip()
     tokens = payload.split()
+    trailer_kw = parsed.get("trailer_keyword")
 
-    actual_count = len([t for t in tokens if t != pad])
+    # Co-requirement: header and trailer must agree on mode.
+    if parsed["binary"] and trailer_kw is not None and trailer_kw != "BYTES":
+        # BINARY header but VALUES trailer — malformed
+        count_ok = False
+        actual_count = 0
+    elif not parsed["binary"] and trailer_kw == "BYTES":
+        # Non-BINARY header but BYTES trailer — malformed
+        count_ok = False
+        actual_count = 0
+    elif trailer_kw == "BYTES":
+        # BYTES count: the declared count is the original byte count.
+        # Verify that the payload has at least that many tokens.
+        total_tokens = len(tokens)
+        actual_count = min(parsed["declared_count"], total_tokens) \
+            if parsed["declared_count"] is not None else total_tokens
+        if parsed["declared_count"] is not None:
+            count_ok = (parsed["declared_count"] <= total_tokens)
+        else:
+            count_ok = True
+    else:
+        # VALUES count: excludes null padding tokens
+        actual_count = len([t for t in tokens if t != pad])
+        count_ok = (actual_count == parsed["declared_count"])
+
     crc = binascii.crc32(payload.encode("utf-8")) & 0xFFFFFFFF
     actual_crc = format(crc, "08X")
 
     return {
-        "count_ok":     (actual_count == parsed["declared_count"]),
+        "count_ok":     count_ok,
         "crc_ok":       (actual_crc == parsed["declared_crc"]),
         "actual_count": actual_count,
         "actual_crc":   actual_crc,
@@ -293,6 +352,89 @@ def encode(text, width=5, cols=6):
         lines.append("  ".join(chunk))
 
     return "\n".join(lines)
+
+
+def encode_binary(data, cols=6):
+    """
+    Encode a byte stream as WIDTH/3 zero-padded decimal tokens.
+
+    Each byte (0-255) becomes a 3-digit decimal token.  No NFC
+    normalisation is applied — input is raw bytes.
+
+    Args:
+        data: Input bytes
+        cols: Values per row (default: 6, 0 = no wrapping)
+
+    Returns:
+        Encoded string — whitespace-separated 3-digit values.
+    """
+    if not data:
+        return ""
+
+    values = ["{0:03d}".format(b) for b in bytearray(data)]
+
+    if cols == 0:
+        return " ".join(values)
+
+    pad = "000"
+    lines = []
+
+    for start in range(0, len(values), cols):
+        chunk = values[start:start + cols]
+        chunk.extend([pad] * (cols - len(chunk)))
+        lines.append("  ".join(chunk))
+
+    return "\n".join(lines)
+
+
+def decode_binary(data, skip_null=True):
+    """
+    Decode WIDTH/3 decimal tokens back to a byte stream.
+
+    If data contains an FDS-FRAME or Print Profile header with a BYTES
+    trailer, the byte count determines the data/padding boundary and
+    null-skip is disabled (per Section 6.2.2 of draft-darley-fds-01).
+
+    For bare payloads (no frame), skip_null controls whether 000 tokens
+    are skipped (default: True for backwards compatibility).
+
+    Args:
+        data: Input string — bare WIDTH/3 payload or framed artifact
+        skip_null: If True and no BYTES trailer present, skip null
+            tokens (000).  Ignored when a BYTES trailer is present.
+
+    Returns:
+        Decoded bytes.
+
+    Tokens outside the range 0-255 are silently skipped.
+    """
+    parsed = parse_frame(data)
+
+    if parsed["header_found"]:
+        payload = parsed["payload_str"]
+    else:
+        payload = data
+
+    # If we have a BYTES count from the trailer, use it as the
+    # authoritative data/padding boundary.  No null-skip.
+    byte_count = None
+    if parsed["trailer_found"] and parsed["trailer_keyword"] == "BYTES":
+        byte_count = parsed["declared_count"]
+
+    tokens = payload.split()
+    result = []
+
+    for i, token in enumerate(tokens):
+        if byte_count is not None and len(result) >= byte_count:
+            break
+        value = _parse_int_token(token)
+        if value is None or value > BYTE_MAX:
+            continue
+        if byte_count is None and skip_null and token == "000":
+            continue
+        result.append(value)
+
+    return bytes(bytearray(result))
 
 
 def decode(data, width=5, skip_null=True):
@@ -368,12 +510,15 @@ def verify(data, width=5):
     else:
         payload = data
 
+    is_binary = parsed["binary"] if parsed["header_found"] else False
+    max_value = BYTE_MAX if is_binary else UNICODE_MAX
+
     tokens = payload.split()
     invalid = []
 
     for token in tokens:
         value = _parse_int_token(token)
-        if value is None or len(token) != width or not _is_valid_codepoint(value):
+        if value is None or len(token) != width or value < 0 or value > max_value:
             invalid.append(token)
 
     total = len(tokens)
@@ -397,7 +542,7 @@ def _box_line(content):
 
 
 def frame(payload, ref="", page="1/1", med="FLASH", attribution="",
-          width=5, cols=6):
+          width=5, cols=6, binary=False, byte_count=None):
     """
     Wrap an encoded payload in a self-describing Print Profile artifact.
 
@@ -406,32 +551,46 @@ def frame(payload, ref="", page="1/1", med="FLASH", attribution="",
 
     CRC32 is computed over the payload string exactly as transmitted
     (post-encode, pre-frame, trailing whitespace stripped).
-    Value count excludes padding null tokens.
+
+    For text frames, the trailer uses VALUES (excluding null padding).
+    For binary frames, the trailer uses BYTES (exact original byte count).
 
     Args:
-        payload: Encoded FDS payload string (output of encode())
+        payload: Encoded FDS payload string (output of encode() or encode_binary())
         ref: Artifact reference ID, e.g. 'SI-2084-FP-001' (optional)
         page: Page designation, e.g. '1/1' (default: '1/1')
         med: Medium designation, e.g. 'FLASH', 'PAPER' (default: FLASH)
         attribution: Attribution string for footer, e.g. 'Sakura Inari' (optional)
         width: Field width used for encoding (default: 5)
         cols: Columns used for encoding (default: 6)
+        binary: If True, include BINARY flag in header (default: False)
+        byte_count: Exact byte count for BINARY frames (required when binary=True)
 
     Returns:
         Complete Print Profile artifact as a string.
     """
     pad = "0" * width
     tokens = payload.split()
-    real_count = len([t for t in tokens if t != pad])
     crc = binascii.crc32(payload.strip().encode("utf-8")) & 0xFFFFFFFF
     crc_str = format(crc, "08X")
 
+    if binary:
+        if byte_count is None:
+            raise ValueError("byte_count is required for binary frames")
+        real_count = byte_count
+        count_keyword = "BYTES"
+    else:
+        real_count = len([t for t in tokens if t != pad])
+        count_keyword = "VALUES"
+
     enc_line = "ENC: UCS {d} DEC {d} COL/{c} {d} PAD/{p}".format(
         d=MIDDLE_DOT, c=cols, p=pad)
-    wid_line = "WIDTH/{w} {d} MED: {m}".format(
-        d=MIDDLE_DOT, w=width, m=med)
-    cnt_line = "{n} VALUES {d} CRC32:{crc}".format(
-        d=MIDDLE_DOT, n=real_count, crc=crc_str)
+    wid_line = "WIDTH/{w}".format(w=width)
+    if binary:
+        wid_line += " {d} BINARY".format(d=MIDDLE_DOT)
+    wid_line += " {d} MED: {m}".format(d=MIDDLE_DOT, m=med)
+    cnt_line = "{n} {kw} {d} CRC32:{crc}".format(
+        d=MIDDLE_DOT, n=real_count, kw=count_keyword, crc=crc_str)
 
     header_lines = [_box_rule()]
     if ref:
@@ -556,6 +715,9 @@ def build_parser():
     parser.add_argument(
         "--attribution", default="", metavar="TEXT",
         help="Attribution string for Print Profile footer")
+    parser.add_argument(
+        "--binary", action="store_true",
+        help="WIDTH/3 BINARY mode: encode/decode raw byte streams")
 
     return parser
 
@@ -564,22 +726,40 @@ def main():
     """CLI entrypoint."""
     parser = build_parser()
     args = parser.parse_args()
-    data = _read_stdin()
-    parsed = parse_frame(data)
+
+    is_binary = args.binary
 
     # ── encode ────────────────────────────────────────────────────────────────
     if args.encode:
-        payload = encode(data, width=args.width, cols=args.cols)
+        if is_binary:
+            raw = _read_stdin_bytes()
+            payload = encode_binary(raw, cols=args.cols)
+            width = 3
+        else:
+            raw = None
+            data = _read_stdin()
+            payload = encode(data, width=args.width, cols=args.cols)
+            width = args.width
+
         if args.frame:
             output = frame(payload, ref=args.ref, page=args.page,
                            med=args.med, attribution=args.attribution,
-                           width=args.width, cols=args.cols)
+                           width=width, cols=args.cols, binary=is_binary,
+                           byte_count=len(raw) if is_binary else None)
         else:
             output = payload
         _write_stdout(output)
         if not output.endswith("\n"):
             _write_stdout("\n")
         return 0
+
+    # For decode/verify, read text and parse frame
+    data = _read_stdin()
+    parsed = parse_frame(data)
+
+    # Auto-detect binary mode from frame header
+    if parsed["header_found"] and parsed["binary"]:
+        is_binary = True
 
     # ── decode ────────────────────────────────────────────────────────────────
     if args.decode:
@@ -598,9 +778,13 @@ def main():
                         file=sys.stderr)
                 return 1
 
-        output = decode(data, width=args.width,
-                        skip_null=not args.keep_null)
-        _write_stdout(output)
+        if is_binary:
+            output_bytes = decode_binary(data, skip_null=not args.keep_null)
+            _write_stdout_bytes(output_bytes)
+        else:
+            output = decode(data, width=args.width,
+                            skip_null=not args.keep_null)
+            _write_stdout(output)
         return 0
 
     # ── verify ────────────────────────────────────────────────────────────────
