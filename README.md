@@ -106,7 +106,9 @@ tools/baseconv/               base conversion utility
 tools/primes/                 Miller-Rabin primality testing
 tools/constants/              named mathematical constant digit generator
 tools/sequences/              OEIS sequence mirror
-tools/mnemonic/               verse-to-prime derivation and CCL prime-twist
+tools/mnemonic/               verse-to-prime, CCL prime-twist, Gloss layer, symbol layer,
+                              pipeline advisor
+tools/udhr/                   UDHR multilingual text mirror (50 languages, 25 scripts)
 tools/texts/                  Project Gutenberg canonical text mirror
 tools/git/                    git bundle tool for FDS payload packaging
 docs/                         supporting material and guides
@@ -222,6 +224,19 @@ confidentiality is required. Apply CCL after. The layers are independent.
 For a complete step-by-step walkthrough of encoding, camouflage, reveal,
 and decode using only a Unicode table and a calculator, see
 [docs/operator-worked-example.md](docs/operator-worked-example.md).
+
+For Arabic, CJK, Hangul, Hebrew, Devanagari, Thai, or any script with
+code points above U+0800, apply the **Gloss Layer** before CCL. It
+re-encodes high-codepoint tokens into a key-derived base-52 Latin
+alphabet, restoring full CCL feasibility and adding up to +1.36
+bits/token for Chinese text. See
+[docs/mnemonic/gloss-README.md](docs/mnemonic/gloss-README.md).
+
+For Arabic, CJK, Hangul, and other non-Latin scripts, apply the Gloss
+Layer before CCL to maximise entropy and destroy script fingerprints:
+`tools/mnemonic/gloss_twist.py`. See
+[docs/entropy-analysis.md](docs/entropy-analysis.md) for measured entropy
+across 20 languages and scripts.
 
 ![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
 
@@ -350,6 +365,11 @@ Expected result: legible text.
 | **CCL full capability demo** | [demo/ccl_demo.sh](demo/ccl_demo.sh) |
 | **Canonical text corpus** | [tools/texts/README.md](tools/texts/README.md) |
 | **Operator worked example** | [docs/operator-worked-example.md](docs/operator-worked-example.md) |
+| **Pipeline advisor** | [tools/mnemonic/crowsong-advisor.py](tools/mnemonic/crowsong-advisor.py) |
+| **Entropy analysis (20 languages)** | [docs/entropy-analysis.md](docs/entropy-analysis.md) |
+| **How to reproduce the analysis** | [docs/entropy-analysis-howto.md](docs/entropy-analysis-howto.md) |
+| **UDHR multilingual corpus** | [tools/udhr/README.md](tools/udhr/README.md) |
+| **Gloss layer (non-Latin scripts)** | [docs/mnemonic/gloss-README.md](docs/mnemonic/gloss-README.md) |
 | **Threat model** | [THREAT-MODEL.md](THREAT-MODEL.md) |
 | **Regulatory status** | [EU_DECLARATION_OF_CONFORMITY.md](EU_DECLARATION_OF_CONFORMITY.md) |
 | **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |

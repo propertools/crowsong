@@ -346,3 +346,4 @@ def derive_from_melody(intervals=None, midi=None, parsons=None,
         "N":              N,
         "P":              P,
     }
+

@@ -3,7 +3,7 @@
 *How to encode, camouflage, reveal, and decode a message by hand.*
 
 **Classification:** TLP:CLEAR
-**Version:** 0.1
+**Version:** 0.2
 **Status:** Pre-normative worked example
 
 ---
@@ -467,6 +467,104 @@ not the verse.
 
 ---
 
+## Non-Latin scripts: the Gloss Layer
+
+The worked example above uses ASCII (English). For text in Arabic, CJK,
+Hangul, Hebrew, Devanagari, Thai, or any script with code points above
+roughly U+0800, a structural limitation applies before CCL is attempted.
+
+**The problem:** CCL's feasibility test (`base^5 > token_value`) is
+hostile to high code points. A CJK character at token value 30,000 is
+only feasible in bases 8 and 9. Twist rate is structurally capped.
+
+**The solution:** apply the Gloss Layer (`tools/mnemonic/gloss_twist.py`)
+before CCL. The Gloss Layer re-encodes each token value in base 52
+(letters A–Z a–z), producing three output tokens per input token. Output
+code points fall in the ASCII letter range (65–122), where all bases
+3–9 are feasible on every token.
+
+Key derivation uses the **reversed** digit sequence of the prime —
+producing a second independent schedule from the same prime with zero
+additional key material. 78% of digit positions differ between the
+forward (CCL) and reversed (Gloss) schedules.
+
+**Entropy gain (3-pass CCL):**
+
+| Script | CCL3 alone | Gloss + CCL3 | Gain |
+|--------|-----------|--------------|------|
+| Chinese | 5.93 | 7.29 | +1.36 bits/token |
+| Korean | 6.17 | 7.47 | +1.30 |
+| Japanese | 6.11 | 7.24 | +1.13 |
+| Arabic | 6.40 | 7.05 | +0.65 |
+| Hebrew | 6.40 | 7.02 | +0.62 |
+| Hindi | 6.61 | 7.09 | +0.48 |
+| Russian | 6.83 | 7.28 | +0.45 |
+| English | 8.16 | 7.56 | −0.60 (CCL alone preferred) |
+
+For non-Latin scripts, use the advisor to determine the best pipeline:
+
+```bash
+cat docs/udhr/Arabic/arz_Arabic.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python tools/mnemonic/crowsong-advisor.py
+```
+
+See `docs/mnemonic/gloss-README.md` for the full Gloss Layer design.
+
+---
+
+## UDHR corpus for entropy analysis
+
+`tools/udhr/udhr.py` mirrors UDHR translations from OHCHR as PDFs,
+organized on disk by Unicode script family. The UDHR is the ideal
+entropy analysis corpus: the same document in every language,
+professionally translated, covering 560+ translations and 25+ scripts.
+
+```bash
+# First run: discover all available language codes from OHCHR
+python tools/udhr/udhr.py discover
+
+# Review what's available
+python tools/udhr/udhr.py list
+python tools/udhr/udhr.py list --script Arabic
+
+# Fetch all PDFs (canonical archival copies)
+python tools/udhr/udhr.py fetch --all
+
+# Fetch PDFs and extract plain text alongside for analysis
+python tools/udhr/udhr.py fetch --all --extract
+
+# Or extract text from already-cached PDFs
+python tools/udhr/udhr.py extract arz chn jpn
+
+# Verify the corpus
+python tools/udhr/udhr.py verify
+```
+
+Directory layout after fetch:
+
+```
+docs/udhr/
+    Arabic/
+        arz_Arabic.pdf
+        arz_Arabic.txt    (if --extract)
+        per_Persian.pdf
+        urd_Urdu.pdf
+    CJK/
+        chn_Chinese-Simplified.pdf
+        jpn_Japanese.pdf
+    Devanagari/
+        hnd_Hindi.pdf
+    ...
+```
+
+Filenames are `{ohchr_code}_{Language}.pdf` — both the retrieval code
+and the human-readable name are visible in any file browser without
+needing a manifest. The script directory tells you at a glance which
+CCL mode is appropriate.
+
+---
+
 ## Reference: base conversion tables
 
 ### Powers of small bases
@@ -496,7 +594,8 @@ Bases 3–9 are all feasible for code points up to:
 - Base 9: up to 59048
 
 For Unicode text outside the ASCII range, check the token value against
-the base^5 ceiling before applying the twist.
+the base^5 ceiling before applying the twist. If most of your tokens
+exceed base 7's ceiling (16,806), use the Gloss Layer.
 
 ---
 
