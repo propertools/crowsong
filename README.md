@@ -106,19 +106,22 @@ tools/baseconv/               base conversion utility
 tools/primes/                 Miller-Rabin primality testing
 tools/constants/              named mathematical constant digit generator
 tools/sequences/              OEIS sequence mirror
+tools/cmudict/                CMU Pronouncing Dictionary mirror (syllable bins for haiku)
 tools/mnemonic/               verse-to-prime, CCL prime-twist, Gloss layer, symbol layer,
-                              pipeline advisor
+                              pipeline advisor, haiku machine
 tools/udhr/                   UDHR multilingual text mirror (50 languages, 25 scripts)
 tools/texts/                  Project Gutenberg canonical text mirror
 tools/git/                    git bundle tool for FDS payload packaging
 docs/                         supporting material and guides
 docs/constants/               pre-generated constant digit files (10,000 digits each)
 docs/sequences/               cached OEIS sequences
+docs/cmudict/                 cached CMU Pronouncing Dictionary and syllable bins
 docs/texts/                   cached canonical texts (42 texts, 16 regions)
 docs/quickref/                pre-generated Unicode quick reference cards
 archive/                      canonical test vectors
 tests/roundtrip/              verification scripts
 demo/                         runnable demonstrations
+ISSUE-TRACKER.md              bug and task registry (bugs live with the code)
 ```
 
 ---
@@ -302,6 +305,49 @@ The primes exist nowhere until the moment of derivation.
 
 ---
 
+## Haiku Machine
+
+The same prime that drives CCL also drives a deterministic haiku
+generator. The prime's forward digits select syllable counts; the
+reversed digits select words within each syllable bin. One prime, two
+schedules, zero additional key material — the same structural pattern
+as the Gloss layer.
+
+The format eats its own output. Each haiku seeds the next.
+
+```bash
+# One-time setup: mirror CMU Pronouncing Dictionary
+python tools/cmudict/cmudict.py fetch
+python tools/cmudict/cmudict.py export
+
+# Generate from K1 (canonical test vector)
+echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
+  python tools/mnemonic/haiku_twist.py --bins docs/cmudict/bins.json generate
+
+# Ouroboros chain: each haiku seeds the next
+echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
+  python tools/mnemonic/haiku_twist.py --bins docs/cmudict/bins.json chain --steps 7
+
+# Word-space camouflage: encode arbitrary text as haiku poetry
+cat archive/second-law-blues.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python tools/mnemonic/haiku_twist.py --bins docs/cmudict/bins.json \
+        encode-stream --verse verses.txt --ref STREAM-001 \
+    > archive/second-law-blues-haiku.txt
+```
+
+The canonical test vector verse is the first line of "Second Law Blues"
+by T. Darley — the same poem whose UCS-DEC encoding is the canonical CCL
+test payload (534 tokens, CRC32:E8DC9BF3). The same prime generates both.
+The encoding eats its own attribution.
+
+*Dedicated to Felix 'FX' Lindner (1975–2026).*
+*The signal strains, but never gone.*
+
+One prime. Two schedules. Infinite poems.
+
+---
+
 ## What this system actually is
 
 UCS-DEC and CCL together form a layered signal survival system:
@@ -366,6 +412,8 @@ Expected result: legible text.
 | **Canonical text corpus** | [tools/texts/README.md](tools/texts/README.md) |
 | **Operator worked example** | [docs/operator-worked-example.md](docs/operator-worked-example.md) |
 | **Pipeline advisor** | [tools/mnemonic/crowsong-advisor.py](tools/mnemonic/crowsong-advisor.py) |
+| **Haiku machine** | [tools/mnemonic/README.md](tools/mnemonic/README.md) |
+| **CMU dict mirror** | [tools/cmudict/README.md](tools/cmudict/README.md) |
 | **Entropy analysis (20 languages)** | [docs/entropy-analysis.md](docs/entropy-analysis.md) |
 | **How to reproduce the analysis** | [docs/entropy-analysis-howto.md](docs/entropy-analysis-howto.md) |
 | **UDHR multilingual corpus** | [tools/udhr/README.md](tools/udhr/README.md) |
@@ -373,6 +421,7 @@ Expected result: legible text.
 | **Threat model** | [THREAT-MODEL.md](THREAT-MODEL.md) |
 | **Regulatory status** | [EU_DECLARATION_OF_CONFORMITY.md](EU_DECLARATION_OF_CONFORMITY.md) |
 | **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |
+| **Issue tracker** | [ISSUE-TRACKER.md](ISSUE-TRACKER.md) |
 
 ---
 
@@ -425,7 +474,7 @@ Early drafts. Subject to revision.
 
 Feedback welcome via:
 
-- GitHub Issues
+- ISSUE-TRACKER.md
 - Email: trey@propertools.be
 - IETF DTNWG / DISPATCH
 
