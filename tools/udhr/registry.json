@@ -1,0 +1,290 @@
+{
+  "amh": {
+    "code": "amh",
+    "name": "Amharic",
+    "region": "East-Africa",
+    "script": "Ethiopic"
+  },
+  "arm": {
+    "code": "arm",
+    "name": "Armenian",
+    "region": "Caucasus",
+    "script": "Armenian"
+  },
+  "arz": {
+    "code": "arz",
+    "name": "Arabic",
+    "region": "Global",
+    "script": "Arabic"
+  },
+  "asm": {
+    "code": "asm",
+    "name": "Assamese",
+    "region": "South-Asia",
+    "script": "Bengali"
+  },
+  "bng": {
+    "code": "bng",
+    "name": "Bengali",
+    "region": "South-Asia",
+    "script": "Bengali"
+  },
+  "bul": {
+    "code": "blg",
+    "name": "Bulgarian",
+    "region": "Europe",
+    "script": "Cyrillic"
+  },
+  "chn": {
+    "code": "chn",
+    "name": "Chinese-Simplified",
+    "region": "East-Asia",
+    "script": "CJK"
+  },
+  "cht": {
+    "code": "cht",
+    "name": "Chinese-Traditional",
+    "region": "East-Asia",
+    "script": "CJK"
+  },
+  "dut": {
+    "code": "dut",
+    "name": "Dutch",
+    "region": "Europe",
+    "script": "Latin"
+  },
+  "eng": {
+    "code": "eng",
+    "name": "English",
+    "region": "Global",
+    "script": "Latin"
+  },
+  "frn": {
+    "code": "frn",
+    "name": "French",
+    "region": "Global",
+    "script": "Latin"
+  },
+  "ger": {
+    "code": "ger",
+    "name": "German",
+    "region": "Europe",
+    "script": "Latin"
+  },
+  "gjr": {
+    "code": "gjr",
+    "name": "Gujarati",
+    "region": "South-Asia",
+    "script": "Gujarati"
+  },
+  "grk": {
+    "code": "grk",
+    "name": "Greek",
+    "region": "Europe",
+    "script": "Greek"
+  },
+  "hbr": {
+    "code": "hbr",
+    "name": "Hebrew",
+    "region": "Middle-East",
+    "script": "Hebrew"
+  },
+  "hnd": {
+    "code": "hnd",
+    "name": "Hindi",
+    "region": "South-Asia",
+    "script": "Devanagari"
+  },
+  "ind": {
+    "code": "inz",
+    "name": "Indonesian",
+    "region": "Southeast-Asia",
+    "script": "Latin"
+  },
+  "ita": {
+    "code": "itn",
+    "name": "Italian",
+    "region": "Europe",
+    "script": "Latin"
+  },
+  "jpn": {
+    "code": "jpn",
+    "name": "Japanese",
+    "region": "East-Asia",
+    "script": "CJK"
+  },
+  "kan": {
+    "code": "kan",
+    "name": "Kannada",
+    "region": "South-Asia",
+    "script": "Kannada"
+  },
+  "kat": {
+    "code": "geo",
+    "name": "Georgian",
+    "region": "Caucasus",
+    "script": "Georgian"
+  },
+  "khm": {
+    "code": "khm",
+    "name": "Khmer",
+    "region": "Southeast-Asia",
+    "script": "Khmer"
+  },
+  "kor": {
+    "code": "kor",
+    "name": "Korean",
+    "region": "East-Asia",
+    "script": "Hangul"
+  },
+  "lao": {
+    "code": "lao",
+    "name": "Lao",
+    "region": "Southeast-Asia",
+    "script": "Lao"
+  },
+  "mal": {
+    "code": "mls",
+    "name": "Malayalam",
+    "region": "South-Asia",
+    "script": "Malayalam"
+  },
+  "mar": {
+    "code": "mrt",
+    "name": "Marathi",
+    "region": "South-Asia",
+    "script": "Devanagari"
+  },
+  "mon": {
+    "code": "khk",
+    "name": "Mongolian",
+    "region": "Central-Asia",
+    "script": "Cyrillic"
+  },
+  "mya": {
+    "code": "mya",
+    "name": "Burmese",
+    "region": "Southeast-Asia",
+    "script": "Myanmar"
+  },
+  "nep": {
+    "code": "nep",
+    "name": "Nepali",
+    "region": "South-Asia",
+    "script": "Devanagari"
+  },
+  "ory": {
+    "code": "ory",
+    "name": "Odia",
+    "region": "South-Asia",
+    "script": "Oriya"
+  },
+  "per": {
+    "code": "per",
+    "name": "Persian",
+    "region": "Middle-East",
+    "script": "Arabic"
+  },
+  "pnj1": {
+    "code": "pnj1",
+    "name": "Punjabi-Gurmukhi",
+    "region": "South-Asia",
+    "script": "Gurmukhi"
+  },
+  "pol": {
+    "code": "pol",
+    "name": "Polish",
+    "region": "Europe",
+    "script": "Latin"
+  },
+  "por": {
+    "code": "por",
+    "name": "Portuguese",
+    "region": "Global",
+    "script": "Latin"
+  },
+  "rus": {
+    "code": "rus",
+    "name": "Russian",
+    "region": "Global",
+    "script": "Cyrillic"
+  },
+  "sin": {
+    "code": "snh",
+    "name": "Sinhala",
+    "region": "South-Asia",
+    "script": "Sinhala"
+  },
+  "spn": {
+    "code": "spn",
+    "name": "Spanish",
+    "region": "Global",
+    "script": "Latin"
+  },
+  "srp": {
+    "code": "srp",
+    "name": "Serbian",
+    "region": "Europe",
+    "script": "Cyrillic"
+  },
+  "swk": {
+    "code": "swa",
+    "name": "Swahili",
+    "region": "East-Africa",
+    "script": "Latin"
+  },
+  "tam": {
+    "code": "tam",
+    "name": "Tamil",
+    "region": "South-Asia",
+    "script": "Tamil"
+  },
+  "tel": {
+    "code": "tel",
+    "name": "Telugu",
+    "region": "South-Asia",
+    "script": "Telugu"
+  },
+  "tha": {
+    "code": "thj",
+    "name": "Thai",
+    "region": "Southeast-Asia",
+    "script": "Thai"
+  },
+  "tib": {
+    "code": "tib",
+    "name": "Tibetan",
+    "region": "Central-Asia",
+    "script": "Tibetan"
+  },
+  "tur": {
+    "code": "trk",
+    "name": "Turkish",
+    "region": "Middle-East",
+    "script": "Latin"
+  },
+  "ukr": {
+    "code": "ukr",
+    "name": "Ukrainian",
+    "region": "Europe",
+    "script": "Cyrillic"
+  },
+  "urd": {
+    "code": "urd",
+    "name": "Urdu",
+    "region": "South-Asia",
+    "script": "Arabic"
+  },
+  "vie": {
+    "code": "vie",
+    "name": "Vietnamese",
+    "region": "Southeast-Asia",
+    "script": "Latin"
+  },
+  "ydd": {
+    "code": "ydd",
+    "name": "Yiddish",
+    "region": "Global",
+    "script": "Hebrew"
+  }
+}
