@@ -210,21 +210,16 @@ def analyse_script_risk(token_stream):
     if high_fraction >= RISK_THRESHOLD_HIGH:
         risk = "high"
         rec  = (
-            "SCRIPT FINGERPRINTING RISK ({:.0f}% non-ASCII, dominant: {}).
-"
-            "A passive observer can identify the script from token value
-"
-            "distribution even after CCL. The symbol substitution layer
-"
+            "SCRIPT FINGERPRINTING RISK ({:.0f}% non-ASCII, dominant: {}). "
+            "A passive observer can identify the script from token value "
+            "distribution even after CCL. The symbol substitution layer "
             "(gloss_twist.py) is strongly recommended before CCL.".format(
                 100 * high_fraction, dominant))
     elif high_fraction >= RISK_THRESHOLD_MEDIUM:
         risk = "medium"
         rec  = (
-            "Mixed script detected ({:.0f}% non-ASCII, dominant: {}).
-"
-            "Script clusters may be partially visible after CCL.
-"
+            "Mixed script detected ({:.0f}% non-ASCII, dominant: {}). "
+            "Script clusters may be partially visible after CCL. "
             "Consider applying gloss_twist.py before CCL.".format(
                 100 * high_fraction, dominant))
     else:
