@@ -41,24 +41,62 @@ python udhr.py verify
 ```
 docs/udhr/
     Arabic/
-        arz_Arabic.pdf
-        arz_Arabic.txt        (if --extract)
         urd_Urdu.pdf
+    Armenian/
+        arm_Armenian.pdf
+    Bengali/
+        asm_Assamese.pdf
+        bng_Bengali.pdf
     CJK/
         chn_Chinese-Simplified.pdf
         jpn_Japanese.pdf
     Cyrillic/
+        blg_Bulgarian.pdf
+        khk_Mongolian.pdf
         rus_Russian.pdf
         ukr_Ukrainian.pdf
     Devanagari/
         hnd_Hindi.pdf
-        nep_Nepali.pdf
         mrt_Marathi.pdf
+        nep_Nepali.pdf
+    Ethiopic/
+        amh_Amharic.pdf
+    Georgian/
+        geo_Georgian.pdf
+    Greek/
+        grk_Greek.pdf
+    Gujarati/
+        gjr_Gujarati.pdf
+    Gurmukhi/
+        pnj1_Punjabi-Gurmukhi.pdf
+    Hebrew/
+        hbr_Hebrew.pdf
+        ydd_Yiddish.pdf
+    Khmer/
+        khm_Khmer.pdf
     Latin/
+        dut_Dutch.pdf
         eng_English.pdf
         frn_French.pdf
-        ...
-    (one directory per script family)
+        ger_German.pdf
+        inz_Indonesian.pdf
+        itn_Italian.pdf
+        por_Portuguese.pdf
+        spn_Spanish.pdf
+        swa_Swahili.pdf
+        trk_Turkish.pdf
+        vie_Vietnamese.pdf
+    Malayalam/
+        mls_Malayalam.pdf
+    Oriya/
+        ory_Odia.pdf
+    Sinhala/
+        snh_Sinhala.pdf
+    Tamil/
+        tam_Tamil.pdf
+    Thai/
+        thj_Thai.pdf
+    (one directory per script family; .txt alongside .pdf if --extract used)
 ```
 
 Filenames are `{ohchr_code}_{Language}.pdf`. Both the retrieval code and
