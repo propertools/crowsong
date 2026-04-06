@@ -505,6 +505,17 @@ Table of Contents
       encompassing the Basic Multilingual Plane and the majority
       of supplementary planes in common use.
 
+      For content in scripts with code points predominantly above
+      U+0800 (Arabic, CJK, Hangul, Hebrew, Devanagari, Thai, and
+      related scripts), a key-derived base-52 pre-encoding MAY be
+      applied before UCS-DEC to restore full CCL feasibility.  This
+      Gloss layer re-encodes each token value in base 52 (A-Z a-z),
+      producing three output tokens per input; the resulting code
+      points fall in the ASCII letter range (65-122), where all CCL
+      bases 3-9 are feasible on every token.  The Gloss layer is
+      specified in companion document draft-darley-fds-ccl-prime-
+      twist-00 [CCLTWIST].
+
       For content requiring code points above U+1869F, a 7-digit
       extended field width (0000000-1114111) MUST be used.
       The field width MUST be declared in the FDS-FRAME header
@@ -1217,6 +1228,11 @@ Table of Contents
    [UCSDEC]   Darley, T., "ucs_dec_tool.py -- Fox Decimal
               Script encoder/decoder", MIT License, 2026.
               https://github.com/propertools/ucs-dec
+
+   [CCLTWIST] Darley, T., "CCL Prime-Twist and Gloss Layer:
+              Key-Derived Base-Switching and Script-Normalized
+              Pre-Encoding for Fox Decimal Script",
+              draft-darley-fds-ccl-prime-twist-00, April 2026.
 
    [CREDMGR]  Darley, T., "credmgr -- Securely manage
               privileged account credentials via Shamir

@@ -2,7 +2,7 @@
 
 *Design sketch — for incorporation into `draft-darley-shard-bundle-01`*
 
-**Version:** 0.3 (pre-normative)
+**Version:** 0.4 (pre-normative)
 **Classification:** TLP:CLEAR
 **Status:** Working consensus, partially implemented. This document captures
 architectural direction, separation of concerns, minimum viable scope, and
@@ -14,32 +14,39 @@ This is not yet a normative specification.
 
 ## What has been built
 
-Since version 0.1 of this sketch the following have been implemented
-as test implementations and are marked accordingly in all generated
-artifacts:
-
 | Component | Status | Location |
 |-----------|--------|----------|
 | Verse-to-prime derivation | ✅ implemented | `tools/mnemonic/verse_to_prime.py` |
-| CCL prime-twist (single pass) | ✅ implemented | `tools/mnemonic/prime_twist.py` |
-| CCL prime-twist (stack, max 10) | ✅ implemented | `tools/mnemonic/prime_twist.py` |
+| CCL prime-twist (single pass and stack) | ✅ implemented | `tools/mnemonic/prime_twist.py` |
 | CCL pre-normative spec | ✅ drafted | `drafts/draft-darley-fds-ccl-prime-twist-00.txt` |
+| Gloss layer (non-Latin script CCL restoration) | ✅ implemented | `tools/mnemonic/gloss_twist.py` |
+| Symbol layer (script fingerprint camouflage) | ✅ implemented | `tools/mnemonic/symbol_twist.py` |
+| Pipeline advisor with statistical analysis | ✅ implemented | `tools/mnemonic/crowsong-advisor.py` |
 | Named constant digit tables | ✅ generated | `docs/constants/` |
 | OEIS sequence mirror | ✅ implemented | `tools/sequences/sequences.py` |
 | Miller-Rabin primality | ✅ implemented | `tools/primes/primes.py` |
-| CCL live demo | ✅ built | `demo/ccl_demo.sh` |
+| UDHR multilingual corpus | ✅ implemented | `tools/udhr/udhr.py` |
 | Binary seed derivation | 🔄 designed | `tools/mnemonic/mnemonic.py` (pending) |
 | Sparse offset-addressed CCL | 🔄 designed | `tools/mnemonic/prime_twist.py` (pending) |
 
-**CCL empirical results** (canonical 534-token payload, three passes):
+**CCL entropy results** (Shannon H, bits/token, three passes, ±σ):
 
-| Stage | Entropy | Unique tokens |
-|-------|---------|---------------|
-| Original UCS-DEC | 4.78 bits/token | 53 |
-| CCL1 | 6.96 bits/token | 172 |
-| CCL2 | 7.82 bits/token | 282 |
-| CCL3 | **8.37 bits/token** | 375 |
-| AES-128 reference | ~7.9–8.0 bits/byte | — |
+| Script | CCL3 alone | Gloss + CCL3 | Gain |
+|--------|-----------|--------------|------|
+| English (ASCII) | **8.16** ±0.04 | 7.56 | −0.60 (CCL alone preferred) |
+| Russian | 6.83 | **7.28** | +0.45 |
+| Hindi | 6.61 | **7.09** | +0.48 |
+| Hebrew | 6.40 | **7.02** | +0.62 |
+| Arabic | 6.40 | **7.05** | +0.65 |
+| Japanese | 6.11 | **7.24** | +1.13 |
+| Korean | 6.17 | **7.47** | +1.30 |
+| Chinese | 5.93 | **7.29** | +1.36 |
+
+AES-128 reference: ~7.95 bits/byte. Theoretical max (WIDTH/5): 9.97.
+
+The Gloss layer resolves the structural CCL limitation for high-codepoint
+scripts. See `docs/mnemonic/gloss-README.md` and `docs/entropy-analysis.md`
+for the full analysis.
 
 CCL is now substantially specified. This sketch focuses on the remaining
 pre-normative work: **Mnemonic Share Wrapping**.
@@ -101,31 +108,53 @@ For each Shamir share `sᵢ`:
 
 2. Canonicalise
       NFC normalisation (REQUIRED)
-      additional rules: see Open Questions
+      whitespace: strip outer, collapse internal to single space
+      line endings: normalise to LF before encoding
+      punctuation and case: preserve
 
 3. Encode to UCS-DEC
       per draft-darley-fds-00
+      strip whitespace, concatenate tokens, treat as decimal literal
 
-4. Interpret as integer
-      canonical method REQUIRED (see Open Questions)
+4. Derive wrapping key
+      Kᵢ = PBKDF2-HMAC-SHA256(mnemonic_encoded, context=share_id)
+      iteration count: 600,000 (NIST SP 800-132, 2023)
 
-5. Derive wrapping key
-      Kᵢ = KDF(mnemonic_encoded, context=share_id)
-
-6. Wrap share
+5. Wrap share
       wrapped_sᵢ = sᵢ XOR Kᵢ
 
-7. Integrity check (REQUIRED)
-      MAC or checksum over unwrapped share
+6. Integrity check (REQUIRED)
+      HMAC-SHA256 over unwrapped share, keyed with sub-key from Kᵢ
       detects incorrect mnemonic reconstruction before use
 
-8. Package
+7. Package
       wrapped share
       share ID
-      KDF parameters
-      integrity check
+      KDF parameters (algorithm, iteration count)
+      HMAC value
       optional: IV parameters if CCL applied
 ```
+
+### Resolved design decisions
+
+**KDF:** PBKDF2-HMAC-SHA256. Defensible to a standards audience, available
+in Python 2.7+ `hashlib`, no external dependencies.
+
+**Iteration count:** 600,000 (NIST SP 800-132, 2023). Must be declared in
+the RSRC block to allow future increases without breaking existing artifacts.
+
+**Integer interpretation:** strip whitespace from the UCS-DEC token stream,
+concatenate token values, treat as decimal literal. Canonical and
+deterministic.
+
+**Canonicalisation:** NFC normalisation required. Strip outer whitespace,
+collapse internal runs to single spaces, preserve punctuation and case,
+normalise line endings to LF before encoding. This is the minimum that
+allows reasonable verse transcription tolerance without introducing
+ambiguity.
+
+**Mnemonic error tolerance:** strict matching for `-01`. Fuzzy matching
+deferred to a later revision.
 
 ### Properties
 
@@ -161,6 +190,13 @@ If mnemonics are drawn from published works, key material exists globally.
 Destruction of devices does not destroy the mnemonic. Recovery remains
 possible. The signal survives because the medium cannot erase literature.
 
+The UDHR corpus (`docs/udhr/`, 560+ translations via `tools/udhr/udhr.py`)
+is an operationally useful mnemonic source: the same text exists in every
+language, professionally translated, memorisable in one's native tongue,
+globally retrievable, and present in the internet archive. A verse memorised
+from the UDHR in Amharic or Tibetan is genuinely obscure to a border agent —
+and recoverable from any library in the world.
+
 ### Named constants as IV
 
 The IV anchors the public component of the 3/3 construction. Pre-generated
@@ -175,7 +211,7 @@ digit tables for the following constants are in `docs/constants/`:
 | √3 | A002194 | |
 | ln(2) | A002162 | |
 | ζ(3) | A002117 | Apery's constant |
-| MM₇ | — | Fourth Double Mersenne prime |
+| MM₇ | — | Fourth Double Mersenne prime (Serafina Tauform) |
 
 The IV is specified by name, not value. Public. Deterministic. Offline
 reproducible. Generated by `tools/constants/constants.py`.
@@ -200,8 +236,6 @@ bytes (PNG, audio, document, ...)
 
 No NFC normalisation. No UCS-DEC encoding. Bytes are bytes. The
 construction is identical downstream.
-
-This changes the operational model:
 
 | Property | Verse mnemonic | Binary seed |
 |----------|---------------|-------------|
@@ -228,32 +262,22 @@ prime P (from verse or binary seed)
   + named sequence (e.g. π, A000796)
   + window size k
   → deterministic sparse address walk over the sequence
-  → extracts N bytes at addressed positions
+  → extracts one byte per step at addressed positions
   → those bytes → key material for share reconstruction
 ```
 
-The address walk (sparse offset-addressed CCL) works as follows:
+The address walk:
 
 ```
-Chunk the digits of P into windows of size k.
-For each chunk:
-  base_digit  = chunk[0]           → candidate base (how)
-  offset_word = int(chunk[1:])     → raw offset (where)
-  offset      = offset_word mod sequence_length
-  collision   → first-hit wins, later hits ignored
-Extract the byte at each addressed position.
-Concatenate extracted bytes → raw key material.
+digits of P taken in windows of k
+  each window W → integer offset into sequence
+  sequence[offset : offset+1] → byte extracted
+  collision (already visited) → skip, continue
+  repeat until floor(len(P_digits) / k) steps exhausted
 ```
 
-**Why this is interesting:**
-
-The corpus (π, e, φ, OEIS sequences) is public, indestructible, and
-offline-reproducible. The bytes addressed are determined entirely by the
-prime, which is determined by the seed. Two different seeds produce two
-completely different access patterns over the same public corpus.
-
-The key material is already out there. It is inaccessible without
-knowing which prime, which sequence, which window size.
+The key material is already out there. It is inaccessible without knowing
+which prime, which sequence, which window size.
 
 **The cross-border 3/3 construction:**
 
@@ -261,7 +285,7 @@ knowing which prime, which sequence, which window size.
 Share 1: named constant (IV)                  public, indestructible
 Share 2: verse memorised before travel        → prime P₁
                                               → addresses bytes in π
-Share 3: meme posted publicly 15 years ago   → prime P₂ (binary seed)
+Share 3: image posted publicly years ago      → prime P₂ (binary seed)
                                               → addresses bytes in A000796
 ```
 
@@ -274,19 +298,16 @@ The adversary at the border sees:
 The coercion surface is: *which verse, which image, which sequence,
 which offset.* Not the key itself.
 
-"I don't remember which tweet" is genuinely plausible deniability.
-The image is the key. The key exists nowhere until derived from the file.
-
 **Empirical results (The Barking Floyd test):**
 
 Binary seed: a 2.1MB PNG → SHA256 → prime `16854375336399765067...`
-(77 digits). Applied as sparse CCL (k=3, first-hit) over the canonical
-534-token FDS payload:
+(77 digits). Applied as sparse addressing (k=3, first-hit) over a
+canonical FDS payload:
 
 - 25 addressing steps from 77 prime digits
 - 24 positions hit (4.5% coverage), 1 collision skipped
-- Deterministic: same image always produces same prime and same
-  address pattern
+- Deterministic: same image always produces same prime and same address
+  pattern
 - Avalanche: one flipped byte → 71% divergence in addressed positions
 
 Sparse addressing alone is not a workhorse for entropy. It is a
@@ -322,15 +343,12 @@ P₁ + P₂ + P₃ → three Shamir shares → master key
 The logos are public, on every website, retrievable from the internet
 archive. Possessing them proves nothing. Everyone has them.
 
-The secret is: *which logos, which versions, which order, which
-sequence, which offset.*
+The secret is: *which logos, which versions, which order, which sequence,
+which offset.* That is knowledge, not data. It is not written down
+anywhere. It is recoverable from memory and from the internet archive.
 
 The Google logo changed in 2015. The Microsoft logo changed in 2012.
-Which version is part of the secret. That is knowledge, not data.
-It is not written down anywhere. It is recoverable from memory and
-from the internet archive.
-
-The adversary sees three corporate logos. There is no key here.
+Which version is part of the secret.
 
 Properties of this construction:
 - Publicly available seeds — retrievable by anyone
@@ -340,11 +358,6 @@ Properties of this construction:
 - Individually unremarkable — possessing any one proves nothing
 - Jointly specific — the combination is held only in memory
 - Deniable — "I just had some logo files" is entirely plausible
-
-This is the binary seed construction made tangible. Any set of
-canonical public files — logos, album covers, flag images, official
-portraits — can serve as seeds. The files are the key. The key exists
-nowhere until derived.
 
 **Status:** binary seed derivation implemented in `mnemonic.py`
 (pending). Sparse addressing construction designed; implementation
@@ -380,12 +393,36 @@ are composable but strictly independent. A verse used as a CCL key via
 the two constructions MUST NOT be conflated. Wrap shares first; apply CCL
 to the encoded output independently.
 
+### Gloss layer
+
+For Arabic, CJK, Hangul, Hebrew, Devanagari, Thai, and any script with
+code points above roughly U+0800, apply the Gloss layer before CCL. The
+Gloss layer re-encodes each UCS-DEC token value in base 52 (A–Z a–z),
+producing three output tokens per input. Output code points fall in the
+ASCII letter range (65–122), where all CCL bases 3–9 are feasible on
+every token.
+
+Key derivation for the Gloss alphabet permutation uses the **reversed**
+digit sequence of the prime — producing a second independent schedule
+from the same prime with zero additional key material. 78% of digit
+positions differ between the forward (CCL) and reversed (Gloss) schedules.
+
+Use `tools/mnemonic/crowsong-advisor.py` to determine the optimal pipeline
+for a given input:
+
+```bash
+cat docs/udhr/Arabic/arz_Arabic.txt \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode \
+    | python tools/mnemonic/crowsong-advisor.py
+```
+
 ### Layer model
 
 | Layer | Responsibility |
 |-------|---------------|
 | Shamir | Threshold security |
 | Mnemonic wrapping | Human recovery |
+| Gloss | CCL feasibility for non-Latin scripts |
 | CCL | Salience reduction |
 | FDS | Transport encoding |
 
@@ -407,47 +444,26 @@ The following gate normative specification of Mnemonic Share Wrapping.
 CCL open questions are tracked in `drafts/draft-darley-fds-ccl-prime-twist-00.txt`
 §11.
 
-### 1. KDF selection (primary gate)
+### 1. KDF iteration count
 
-Everything else waits on this.
+KDF selection is resolved (PBKDF2-HMAC-SHA256). The open question is
+iteration count. Recommendation: 600,000 (NIST SP 800-132, 2023). Must be
+declared in the RSRC block to allow future increases without breaking
+existing artifacts. Final value must be documented normatively in `-01`.
 
-| Candidate | Notes |
-|-----------|-------|
-| PBKDF2-HMAC-SHA256 | Portable, Python 2.7+, well-understood |
-| HKDF | Cleaner derivation, requires HMAC |
-| Minimal SHA | Simplest, lowest dependency |
+### 2. Integrity check mechanism
 
-**Recommendation:** PBKDF2-HMAC-SHA256. Defensible to a standards audience,
-available in Python 2.7+ `hashlib`, no external dependencies.
+| Option | Notes |
+|--------|-------|
+| HMAC-SHA256 | Cryptographically strong; requires key material |
+| BLAKE3 | Fast, keyed mode available; no Python stdlib |
+| SHA256 truncated | Simple; not a MAC; no authentication |
 
-### 2. Integer interpretation of UCS-DEC output
+**Recommendation:** HMAC-SHA256 over the unwrapped share, keyed with a
+sub-key derived from Kᵢ. This is the minimum that detects incorrect
+mnemonic reconstruction before use. Needs formal specification.
 
-Must be canonical — either concatenation of token values as a decimal
-string, or the token string with whitespace stripped. Both produce the same
-result. Must be documented explicitly.
-
-**Recommendation:** strip whitespace, concatenate, treat as decimal literal.
-
-### 3. Canonicalisation rules for mnemonic input
-
-NFC normalisation is required. Beyond that:
-
-- Whitespace: strip outer, collapse internal to single spaces
-- Punctuation: preserve
-- Case: preserve
-- Line endings: normalise to LF before encoding
-
-**Recommendation:** the above. This is the minimum that allows reasonable
-verse transcription tolerance without introducing ambiguity.
-
-### 4. Mnemonic error tolerance
-
-Strict matching is deterministic and auditable. Fuzzy matching is risky,
-ambiguous, and hard to specify.
-
-**Recommendation:** strict for `-01`. Fuzzy matching deferred.
-
-### 5. Share packet format
+### 3. Share packet format
 
 Where does the wrapped share live?
 
@@ -458,6 +474,13 @@ Where does the wrapped share live?
 Unresolved. Likely: standalone FDS artifact with RSRC block, parallel to
 the `verse_to_prime.py` artifact format.
 
+### 4. Sparse addressing coverage floor
+
+The Barking Floyd test showed 4.5% coverage (24/25 positions hit, k=3,
+77 prime digits). Is this sufficient for key material? What is the minimum
+coverage floor for safe use? Deferred pending empirical validation over
+larger corpora and a range of prime lengths.
+
 ---
 
 ## Definition of done
@@ -465,18 +488,23 @@ the `verse_to_prime.py` artifact format.
 - [x] Verse-to-prime construction implemented and verified
 - [x] CCL prime-twist implemented and verified (single pass and stack)
 - [x] CCL pre-normative spec drafted
-- [x] CCL transform example with test vector (canonical 534-token payload)
+- [x] Gloss layer implemented (non-Latin scripts, +0.45–+1.36 bits/token)
+- [x] Symbol layer implemented (script fingerprint camouflage)
+- [x] Entropy analysis across 20+ languages documented
 - [x] Named constant digit tables generated and committed
 - [x] Binary seed construction designed and empirically tested
 - [x] Sparse corpus addressing construction designed
+- [x] UDHR multilingual corpus operational (560+ translations, 25+ scripts)
 - [x] Layer separation explicit in spec and implementation
-- [ ] KDF selected and documented
-- [ ] Integer interpretation canonical and documented
-- [ ] Canonicalisation rules specified normatively
+- [x] KDF selection resolved (PBKDF2-HMAC-SHA256)
+- [x] Integer interpretation canonical and documented
+- [x] Canonicalisation rules specified
+- [ ] KDF iteration count finalised and declared in RSRC schema
 - [ ] Mnemonic wrapping specified normatively
-- [ ] Integrity check mechanism (MAC vs checksum) resolved
+- [ ] Integrity check mechanism specified normatively
 - [ ] Share packet format specified
-- [ ] All open questions resolved or explicitly tracked in final draft
+- [ ] Sparse addressing normative coverage floor established
+- [ ] All remaining open questions resolved or explicitly tracked in draft
 
 ---
 

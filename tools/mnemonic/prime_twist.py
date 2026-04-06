@@ -148,6 +148,175 @@ def _from_base(s, base):
     return int(s, base)
 
 
+# ── Script fingerprint detection ─────────────────────────────────────────────
+
+SCRIPT_BLOCKS = [
+    (592,   687,   "Latin Extended / IPA"),
+    (688,   767,   "Spacing Modifiers"),
+    (880,   1023,  "Greek and Coptic"),
+    (1024,  1279,  "Cyrillic"),
+    (1424,  1535,  "Hebrew"),
+    (1536,  1791,  "Arabic"),
+    (2304,  2431,  "Devanagari"),
+    (2432,  2559,  "Bengali"),
+    (3584,  3711,  "Thai"),
+    (4352,  4607,  "Hangul Jamo"),
+    (4608,  4991,  "Ethiopic"),
+    (6144,  6319,  "Khmer"),
+    (7680,  7935,  "Latin Extended Additional"),
+    (19968, 40959, "CJK Unified Ideographs"),
+    (40960, 42127, "Yi"),
+    (44032, 55203, "Hangul Syllables"),
+]
+
+RISK_THRESHOLD_HIGH   = 0.30   # >= 30% non-ASCII -> high risk
+RISK_THRESHOLD_MEDIUM = 0.10   # >= 10% non-ASCII -> medium risk
+
+
+def analyse_script_risk(token_stream):
+    """
+    Analyse a UCS-DEC token stream for script fingerprinting risk.
+
+    Returns a dict with keys:
+        total, ascii, high_bmp, high_fraction,
+        dominant_block, risk ('low'|'medium'|'high'), recommendation
+    """
+    import collections as _c
+    tokens = token_stream.split()
+    if not tokens:
+        return {"total": 0, "risk": "low",
+                "recommendation": "Empty stream.",
+                "high_fraction": 0.0, "dominant_block": "None"}
+
+    values   = [int(t) for t in tokens if t.isdigit()]
+    total    = len(values)
+    ascii_ct = sum(1 for v in values if 32 <= v <= 126)
+    high_bmp = sum(1 for v in values if v > 591)
+
+    clusters = _c.Counter()
+    for v in values:
+        if v <= 591:
+            continue
+        label = "Other non-ASCII"
+        for lo, hi, name in SCRIPT_BLOCKS:
+            if lo <= v <= hi:
+                label = name
+                break
+        clusters[label] += 1
+
+    high_fraction = high_bmp / total if total else 0.0
+    dominant      = clusters.most_common(1)[0][0] if clusters else "None"
+
+    if high_fraction >= RISK_THRESHOLD_HIGH:
+        risk = "high"
+        rec  = (
+            "SCRIPT FINGERPRINTING RISK ({:.0f}% non-ASCII, dominant: {}).
+"
+            "A passive observer can identify the script from token value
+"
+            "distribution even after CCL. The symbol substitution layer
+"
+            "(gloss_twist.py) is strongly recommended before CCL.".format(
+                100 * high_fraction, dominant))
+    elif high_fraction >= RISK_THRESHOLD_MEDIUM:
+        risk = "medium"
+        rec  = (
+            "Mixed script detected ({:.0f}% non-ASCII, dominant: {}).
+"
+            "Script clusters may be partially visible after CCL.
+"
+            "Consider applying gloss_twist.py before CCL.".format(
+                100 * high_fraction, dominant))
+    else:
+        risk = "low"
+        rec  = (
+            "Payload is predominantly ASCII ({:.0f}%). "
+            "CCL3 alone is sufficient.".format(
+                100 * ascii_ct / total if total else 0))
+
+    return {
+        "total":          total,
+        "ascii":          ascii_ct,
+        "high_bmp":       high_bmp,
+        "high_fraction":  high_fraction,
+        "dominant_block": dominant,
+        "risk":           risk,
+        "recommendation": rec,
+        "clusters":       dict(clusters),
+    }
+
+
+def _prompt_symbol_layer(analysis, force_yes=False, force_no=False):
+    """
+    Warn the operator about script fingerprinting risk and prompt for
+    confirmation to proceed without the symbol layer.
+
+    Fail-safe: default is to warn loudly; operator must explicitly
+    acknowledge to proceed.
+
+    Returns True if operator confirms proceeding without symbol layer,
+    False if they want to abort and apply symbol layer first.
+    """
+    risk = analysis["risk"]
+    if risk == "low" or force_yes:
+        return True
+    if force_no:
+        return False
+
+    # Print the warning to stderr so it is visible even when stdout
+    # is being piped to a file
+    w  = "=" * 60
+    print("", file=sys.stderr)
+    print(w, file=sys.stderr)
+    if risk == "high":
+        print("WARNING: SCRIPT FINGERPRINTING RISK", file=sys.stderr)
+    else:
+        print("NOTICE: Mixed script detected", file=sys.stderr)
+    print(w, file=sys.stderr)
+    print("", file=sys.stderr)
+    for line in analysis["recommendation"].splitlines():
+        print("  " + line, file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Dominant script block: {}".format(
+        analysis["dominant_block"]), file=sys.stderr)
+    print("  Non-ASCII tokens:      {}/{} ({:.0f}%)".format(
+        analysis["high_bmp"], analysis["total"],
+        100 * analysis["high_fraction"]), file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  To apply the Gloss Layer first (recommended):", file=sys.stderr)
+    print("    cat payload.txt | python gloss_twist.py gloss \\", file=sys.stderr)
+    print("        --verse key.txt | \\", file=sys.stderr)
+    print("        python prime_twist.py stack \\", file=sys.stderr)
+    print("            --verse-file verses.txt --no-symbol-check", file=sys.stderr)
+    print("", file=sys.stderr)
+    print("  Or symbol_twist.py for visual camouflage:", file=sys.stderr)
+    print("    cat payload.txt | python symbol_twist.py twist \\", file=sys.stderr)
+    print("        --key-verse key.txt | \\", file=sys.stderr)
+    print("        python prime_twist.py stack --verse-file verses.txt", file=sys.stderr)
+    print("", file=sys.stderr)
+    print(w, file=sys.stderr)
+    print("", file=sys.stderr)
+
+    try:
+        if PY2:
+            answer = raw_input(  # noqa: F821
+                "Proceed with CCL only (no symbol layer)? [y/N] "
+            ).strip().lower()
+        else:
+            answer = input(
+                "Proceed with CCL only (no symbol layer)? [y/N] "
+            ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        # Non-interactive context (pipe) — fail safe: abort
+        print("", file=sys.stderr)
+        print("Non-interactive context detected. Aborting.", file=sys.stderr)
+        print("Use --no-symbol-check to suppress this check,", file=sys.stderr)
+        print("or --force-symbol-check to always abort.", file=sys.stderr)
+        return False
+
+    return answer in ("y", "yes")
+
+
 # ── Key schedule ──────────────────────────────────────────────────────────────
 
 SCHEDULE_STANDARD = "standard"
@@ -525,6 +694,12 @@ def build_parser():
     )
     p_twist.add_argument("--ref", default="", metavar="ID")
     p_twist.add_argument("--med", default="PAPER", metavar="MEDIUM")
+    p_twist.add_argument("--no-symbol-check", dest="no_symbol_check",
+        action="store_true",
+        help="suppress script fingerprint warning (ASCII/Latin payloads)")
+    p_twist.add_argument("--force-symbol-check", dest="force_symbol_check",
+        action="store_true",
+        help="abort if non-ASCII content detected (fail-safe mode)")
     p_twist.add_argument(
         "--schedule", default=SCHEDULE_STANDARD,
         choices=SCHEDULES, metavar="SCHEDULE",
@@ -559,6 +734,12 @@ def build_parser():
     )
     p_stack.add_argument("--ref", default="CCL-STACK", metavar="ID")
     p_stack.add_argument("--med", default="PAPER", metavar="MEDIUM")
+    p_stack.add_argument("--no-symbol-check", dest="no_symbol_check",
+        action="store_true",
+        help="suppress script fingerprint warning (ASCII/Latin payloads)")
+    p_stack.add_argument("--force-symbol-check", dest="force_symbol_check",
+        action="store_true",
+        help="abort if non-ASCII content detected (fail-safe mode)")
     p_stack.add_argument(
         "--schedule", default=SCHEDULE_STANDARD,
         choices=SCHEDULES, metavar="SCHEDULE",
@@ -581,6 +762,16 @@ def cmd_twist(args):
     data = _read_stdin().strip()
     if not data:
         print("Error: empty input", file=sys.stderr)
+        return 1
+
+    # Script fingerprinting pre-flight check
+    _analysis = analyse_script_risk(data)
+    force_yes = getattr(args, "no_symbol_check", False)
+    force_no  = getattr(args, "force_symbol_check", False)
+    if not _prompt_symbol_layer(_analysis, force_yes=force_yes,
+                                force_no=force_no):
+        print("Aborted. Apply gloss_twist.py before CCL "
+              "to mask script fingerprint and maximise entropy.", file=sys.stderr)
         return 1
     try:
         int(args.prime)
@@ -639,6 +830,16 @@ def cmd_stack(args):
     data = _read_stdin().strip()
     if not data:
         print("Error: empty input", file=sys.stderr)
+        return 1
+
+    # Script fingerprinting pre-flight check
+    _analysis = analyse_script_risk(data)
+    force_yes = getattr(args, "no_symbol_check", False)
+    force_no  = getattr(args, "force_symbol_check", False)
+    if not _prompt_symbol_layer(_analysis, force_yes=force_yes,
+                                force_no=force_no):
+        print("Aborted. Apply gloss_twist.py before CCL "
+              "to mask script fingerprint and maximise entropy.", file=sys.stderr)
         return 1
 
     # Resolve primes

@@ -27,6 +27,37 @@ Crowsong assumes the network may not exist at all.
 
 ---
 
+## Why this matters
+
+Noor Inayat Khan transmitted in the clear because they took her codes.
+Violette Szabo was caught at a roadblock carrying documents. Virginia Hall
+spent years evading the Gestapo with a wooden leg and sheer nerve, in part
+because she understood operational security at a level her handlers didn't.
+
+SOE agents were fingerprinted by their radio keying patterns. Networks
+unravelled because a single courier knew too much. People broke under
+coercion because there was no way to give up only a decoy. Key material
+existed on paper, in rooms, on bodies — and bodies can be searched.
+
+They improvised brilliance under impossible constraints.
+
+Crowsong is the infrastructure that would have given them better options:
+
+- A key that exists nowhere until the moment of derivation
+- "I don't remember which poem" — genuinely unverifiable
+- A decoy fork that produces a real, plausible artifact under duress
+- A network flat enough that breaking one node reveals nothing about the rest
+- An encoding invisible in plain sight, indistinguishable from noise
+- Key material distributed across human memory, public mathematics,
+  and the cultural record — none of which can be confiscated
+
+This is not a historical exercise. The threat model is current.
+The people who need this today are real.
+
+The system was designed knowing that.
+
+---
+
 ## The stack
 
 ```
@@ -48,7 +79,11 @@ draft-darley-crowsong-00
   ↑ composes
 draft-darley-fds-00           draft-darley-shard-bundle-00
   ↑ implements                  ↑ implements
-tools/ucs-dec/ucs_dec_tool.py
+tools/ucs-dec/ucs_dec_tool.py tools/mnemonic/
+
+draft-darley-fds-ccl-prime-twist-00   (pre-normative)
+  ↑ specifies
+tools/mnemonic/prime_twist.py
 ```
 
 | Draft | Description |
@@ -57,6 +92,7 @@ tools/ucs-dec/ucs_dec_tool.py
 | `draft-darley-shard-bundle-00` | Trust — threshold key distribution |
 | `draft-darley-crowsong-00` | Architecture — how the system composes |
 | `draft-darley-meridian-protocol-01` | Content — continuity of web artifacts |
+| `draft-darley-fds-ccl-prime-twist-00` | Channel Camouflage Layer *(pre-normative)* |
 
 ---
 
@@ -70,10 +106,16 @@ tools/baseconv/               base conversion utility
 tools/primes/                 Miller-Rabin primality testing
 tools/constants/              named mathematical constant digit generator
 tools/sequences/              OEIS sequence mirror
-tools/mnemonic/               verse-to-prime derivation and CCL prime-twist
+tools/mnemonic/               verse-to-prime, CCL prime-twist, Gloss layer, symbol layer,
+                              pipeline advisor
+tools/udhr/                   UDHR multilingual text mirror (50 languages, 25 scripts)
+tools/texts/                  Project Gutenberg canonical text mirror
+tools/git/                    git bundle tool for FDS payload packaging
 docs/                         supporting material and guides
 docs/constants/               pre-generated constant digit files (10,000 digits each)
 docs/sequences/               cached OEIS sequences
+docs/texts/                   cached canonical texts (42 texts, 16 regions)
+docs/quickref/                pre-generated Unicode quick reference cards
 archive/                      canonical test vectors
 tests/roundtrip/              verification scripts
 demo/                         runnable demonstrations
@@ -150,6 +192,53 @@ bash tests/roundtrip/run_tests.sh
 531 VALUES · CRC32:E8DC9BF3 · VERIFIED
 Signal survives.
 ```
+
+---
+
+## Channel Camouflage Layer
+
+UCS-DEC encodes text as human-readable decimal integers. CCL disguises
+that stream by re-expressing each token in a different numeric base,
+driven by a prime-derived key schedule.
+
+The key is a prime number derived from something memorable — a line of
+poetry, a folk melody, a specific image file. The prime's decimal digits
+become the key schedule, cycling through the prime repeatedly (the
+ouroboros). For each token, the scheduled digit determines the output
+base. The token value is re-expressed in that base, still zero-padded
+to five digits, still valid FDS.
+
+After three passes with three distinct verse-derived primes, the output
+is statistically indistinguishable from AES-128 ciphertext. The twist-map
+— recording which base was used at each position — travels in the
+artifact's resource block. The receiver unstacks in reverse and recovers
+the original stream exactly.
+
+The keys live nowhere until derived. Recite the verse. The prime
+appears. Untwist the artifact. The signal was always there.
+
+CCL provides no cryptographic confidentiality. It raises the cost of
+passive attention, not the cost of active decryption. Encrypt first if
+confidentiality is required. Apply CCL after. The layers are independent.
+
+For a complete step-by-step walkthrough of encoding, camouflage, reveal,
+and decode using only a Unicode table and a calculator, see
+[docs/operator-worked-example.md](docs/operator-worked-example.md).
+
+For Arabic, CJK, Hangul, Hebrew, Devanagari, Thai, or any script with
+code points above U+0800, apply the **Gloss Layer** before CCL. It
+re-encodes high-codepoint tokens into a key-derived base-52 Latin
+alphabet, restoring full CCL feasibility and adding up to +1.36
+bits/token for Chinese text. See
+[docs/mnemonic/gloss-README.md](docs/mnemonic/gloss-README.md).
+
+For Arabic, CJK, Hangul, and other non-Latin scripts, apply the Gloss
+Layer before CCL to maximise entropy and destroy script fingerprints:
+`tools/mnemonic/gloss_twist.py`. See
+[docs/entropy-analysis.md](docs/entropy-analysis.md) for measured entropy
+across 20 languages and scripts.
+
+![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
 
 ---
 
@@ -261,41 +350,29 @@ Expected result: legible text.
 
 ## Where to go next
 
-**Start here (implementation):**
-`drafts/draft-darley-fds-00.txt`
-
-**Architecture:**
-`drafts/draft-darley-crowsong-00.txt`
-
-**Trust layer:**
-`drafts/draft-darley-shard-bundle-00.txt`
-
-**Content continuity:**
-`drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt`
-
-**Design doctrine:**
-`docs/structural-principles.md`
-
-**Full suite overview:**
-`docs/crowsong-suite-overview.md`
-
-**Long-horizon physical archival:**
-`docs/vesper-archive-protocol.md`
-
-**Local knowledge infrastructure:**
-`docs/vesper-mirror-architecture.md`
-
-**Mobile app architecture:**
-`docs/crowsong-mobile-architecture.md`
-
-**Mnemonic key wrapping and CCL:**
-`docs/mnemonic-shamir-sketch.md`
-
-**CCL full capability demo:**
-`demo/ccl_demo.sh`
-
-**Roadmap:**
-`docs/crowsong-roadmap.md`
+| | |
+|---|---|
+| **Start here (implementation)** | [drafts/draft-darley-fds-00.txt](drafts/draft-darley-fds-00.txt) |
+| **Architecture** | [drafts/draft-darley-crowsong-00.txt](drafts/draft-darley-crowsong-00.txt) |
+| **Trust layer** | [drafts/draft-darley-shard-bundle-00.txt](drafts/draft-darley-shard-bundle-00.txt) |
+| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt) |
+| **Design doctrine** | [docs/structural-principles.md](docs/structural-principles.md) |
+| **Full suite overview** | [docs/crowsong-suite-overview.md](docs/crowsong-suite-overview.md) |
+| **Long-horizon physical archival** | [docs/vesper-archive-protocol.md](docs/vesper-archive-protocol.md) |
+| **Local knowledge infrastructure** | [docs/vesper-mirror-architecture.md](docs/vesper-mirror-architecture.md) |
+| **Mobile app architecture** | [docs/crowsong-mobile-architecture.md](docs/crowsong-mobile-architecture.md) |
+| **Mnemonic key wrapping and CCL** | [docs/mnemonic-shamir-sketch.md](docs/mnemonic-shamir-sketch.md) |
+| **CCL full capability demo** | [demo/ccl_demo.sh](demo/ccl_demo.sh) |
+| **Canonical text corpus** | [tools/texts/README.md](tools/texts/README.md) |
+| **Operator worked example** | [docs/operator-worked-example.md](docs/operator-worked-example.md) |
+| **Pipeline advisor** | [tools/mnemonic/crowsong-advisor.py](tools/mnemonic/crowsong-advisor.py) |
+| **Entropy analysis (20 languages)** | [docs/entropy-analysis.md](docs/entropy-analysis.md) |
+| **How to reproduce the analysis** | [docs/entropy-analysis-howto.md](docs/entropy-analysis-howto.md) |
+| **UDHR multilingual corpus** | [tools/udhr/README.md](tools/udhr/README.md) |
+| **Gloss layer (non-Latin scripts)** | [docs/mnemonic/gloss-README.md](docs/mnemonic/gloss-README.md) |
+| **Threat model** | [THREAT-MODEL.md](THREAT-MODEL.md) |
+| **Regulatory status** | [EU_DECLARATION_OF_CONFORMITY.md](EU_DECLARATION_OF_CONFORMITY.md) |
+| **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |
 
 ---
 
