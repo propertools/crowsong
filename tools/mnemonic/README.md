@@ -1,6 +1,6 @@
-# tools/mnemonic/ — verse-derived keys and Channel Camouflage Layer
+# tools/mnemonic/ — verse-derived keys, Channel Camouflage Layer, and Haiku Machine
 
-Six files sharing a common construction:
+Seven files sharing a common construction:
 
 ```
 verse
@@ -17,15 +17,18 @@ single canonical implementation of primality testing, prime derivation,
 and verse-to-prime. It is imported by the other tools; none duplicate
 the construction logic.
 
-`verse_to_prime.py` derives the prime and packages it as a self-describing
-FDS Print Profile artifact. `prime_twist.py` uses a prime as a cyclic key
-schedule to apply base-switching transforms to any FDS token stream.
-`gloss_twist.py` applies a key-derived base-52 pre-encoding for non-Latin
-scripts. `symbol_twist.py` applies a key-derived bijection for script
-fingerprint camouflage. `crowsong-advisor.py` reads a UCS-DEC token stream
-and recommends the optimal pipeline.
+All seven tools use one prime, two schedules, zero additional key material:
 
-All six: Python 2.7+/3.x, no external dependencies, MIT licence.
+| Tool | Forward digits | Reversed digits |
+|------|----------------|-----------------|
+| `prime_twist.py` | CCL base-switching schedule | — |
+| `gloss_twist.py` | (uses prime_twist.py for CCL) | Gloss alphabet permutation |
+| `haiku_twist.py` | Syllable count schedule | Word selection seed |
+
+The pattern is the same throughout the stack. Different purposes, same
+construction discipline.
+
+All seven: Python 2.7+/3.x, no external dependencies, MIT licence.
 
 **These are test implementations.** The CCL construction and artifact
 format are not yet normatively specified. See
@@ -98,7 +101,7 @@ RSRC: BEGIN
   N:        <256-bit integer>
   P:        <derived prime>
   DIGITS:   77
-  GENERATED:2026-04-04
+  GENERATED:2026-04-06
 RSRC: END
 
 <UCS-DEC encoding of the prime's digits>
@@ -113,10 +116,6 @@ own output: the prime is encoded in the same format used to derive it.
 - The prime need not be stored; it can be reconstructed deterministically
   from the verse at any time.
 - Deterministic: the same verse always produces the same prime.
-- The primality test is deterministic for n < ~3.3 × 10²⁴. For larger n,
-  including all SHA256-derived inputs, a well-tested fixed-witness heuristic
-  is used — no counterexample is known, and inputs are not adversarially
-  chosen. See `mnemonic.py` for the single canonical implementation.
 - The artifact carries both N and P in its RSRC block. It is a
   reproducibility artifact, not a secrecy wrapper. Confidentiality
   is a separate layer.
@@ -144,51 +143,7 @@ python prime_twist.py stack   --verse-file <file> [--ref ID] [--med M]
 python prime_twist.py unstack <infile>
 ```
 
-### Examples
-
-```bash
-# Single pass — provide a prime directly
-cat payload.txt | \
-    python prime_twist.py twist --prime 748...701 > twisted.txt
-
-# Untwist
-python prime_twist.py untwist twisted.txt | python ucs_dec_tool.py -d
-
-# Triple stack — three primes comma-separated
-cat payload.txt | \
-    python prime_twist.py stack --primes P1,P2,P3 --ref CCL3
-
-# Triple stack — derive primes from a verse file (one verse per line)
-cat payload.txt | \
-    python prime_twist.py stack --verse-file verses.txt --ref CCL3
-
-# Unstack and decode
-python prime_twist.py unstack stacked.txt | python ucs_dec_tool.py -d
-```
-
-### Full pipeline: verse → prime → twist
-
-```bash
-# Derive the key from a verse
-echo "The signal strains, but never gone." | \
-    python verse_to_prime.py derive --ref K1 > k1.txt
-
-# Extract the prime
-PRIME=$(grep "^  P:" k1.txt | awk '{print $2}')
-
-# Apply CCL
-cat payload.txt | \
-    python prime_twist.py twist --prime "$PRIME" --ref CCL1 > twisted.txt
-
-# Recover
-python prime_twist.py untwist twisted.txt | python ucs_dec_tool.py -d
-```
-
 ### Stacking
-
-Multiple passes applied sequentially with distinct primes. Each pass
-takes the token stream output of the previous pass as input. Output is
-a single self-describing stack file containing all pass artifacts.
 
 Maximum depth: 10. Diminishing returns beyond CCL3:
 
@@ -203,32 +158,26 @@ Maximum depth: 10. Diminishing returns beyond CCL3:
 CCL3 exceeds the AES-128 ciphertext entropy reference. A passive
 entropy scanner cannot distinguish it from encrypted data.
 
-For non-Latin scripts, apply the Gloss layer before CCL — see
-`gloss_twist.py` below.
+For non-Latin scripts, apply the Gloss layer before CCL.
 
-### Steganographic injection
+### Schedules
 
-The twisted token stream consists of five-digit decimal integers.
-These occur naturally in telemetry, log files, cross-reference lists,
-and financial records. The stream may be injected into such containers
-without modification. The receiver extracts the numeric field and pipes
-it to `unstack`.
-
-See `demo/ccl_demo.sh` for a full nine-step live demonstration.
+| Schedule | Rule | Use case |
+|----------|------|---------|
+| `standard` | `d → base d` (2–9), fallback base 10 | WIDTH/5 natural language |
+| `mod3` | `d → 7 + (d mod 3)`, always 7–9 | WIDTH/3 binary payloads |
 
 ---
 
 ## gloss_twist.py
 
 The Gloss layer. Applies a key-derived base-52 pre-encoding to FDS token
-streams before CCL. Designed for Arabic, CJK, Hangul, Hebrew, Devanagari,
-Thai, and any script with code points above roughly U+0800 — scripts where
-CCL's feasibility rule (base^WIDTH > token_value) structurally limits twist
-rate and entropy gain.
+streams before CCL. Required for Arabic, CJK, Hangul, Hebrew, Devanagari,
+Thai, and any script with code points above roughly U+0800.
 
-**The problem:** For a CJK token at value 30,000, only bases 8 and 9 pass
-the feasibility check. Twist rate is capped at ~22% per pass regardless of
-the key schedule. Three passes of CCL add little.
+**The problem:** For a CJK token at value 30,000, only bases 8–9 pass
+the feasibility check. Twist rate is capped at ~22% per pass regardless
+of the key schedule. Three passes of CCL add little.
 
 **The construction:** Re-encode each token value in base 52 (A–Z a–z),
 producing three output tokens per input. Output code points fall in the
@@ -236,10 +185,8 @@ ASCII letter range (65–122), where all CCL bases 3–9 are feasible on
 every token.
 
 **Key derivation:** The Gloss alphabet permutation is seeded from
-SHA256 of the **reversed** digit sequence of the prime. This produces
-a second independent schedule from the same prime — one prime, two
-schedules, zero additional key material. 78% of digit positions differ
-between the forward (CCL) and reversed (Gloss) schedules.
+SHA256 of the **reversed** digit sequence of the prime. One prime, two
+schedules, zero additional key material.
 
 **Entropy gain (3-pass CCL):**
 
@@ -257,7 +204,7 @@ between the forward (CCL) and reversed (Gloss) schedules.
 AES-128 reference: ~7.95 bits/byte.
 
 ```bash
-python gloss_twist.py gloss   [--prime P | --verse-file F] [--ref ID]
+python gloss_twist.py gloss   [--prime P | --verse FILE] [--ref ID]
 python gloss_twist.py ungloss <infile>
 python gloss_twist.py info    <infile>
 ```
@@ -265,53 +212,146 @@ python gloss_twist.py info    <infile>
 ### Example pipeline (Arabic)
 
 ```bash
-# Fetch UDHR Arabic and extract text
-python tools/udhr/udhr.py extract arz
-
-# Encode, gloss, twist, analyse
 cat docs/udhr/Arabic/arz_Arabic.txt \
     | python tools/ucs-dec/ucs_dec_tool.py --encode \
-    | python gloss_twist.py gloss --verse-file verses.txt \
+    | python gloss_twist.py gloss --verse verses.txt \
     | python prime_twist.py stack --verse-file verses.txt --ref CCL3 \
     > arabic_ccl3.txt
-
-# Or let the advisor choose for you
-cat docs/udhr/Arabic/arz_Arabic.txt \
-    | python tools/ucs-dec/ucs_dec_tool.py --encode \
-    | python crowsong-advisor.py
 ```
-
-Round-trip verified. See `docs/mnemonic/gloss-README.md` for the full
-design rationale and construction details.
 
 ---
 
 ## symbol_twist.py
 
-The Symbol layer. Applies a key-derived bijection over 62,584 eligible
-Unicode code points to the FDS token value distribution. Primary purpose:
-destroy script fingerprints before CCL runs.
+The Symbol layer. Applies a key-derived bijection for script fingerprint
+camouflage before CCL runs.
 
 **The threat:** UCS-DEC token value distributions leak script identity.
 Arabic clusters at 01536–01791. CJK at 19968–40959. A passive observer
-can identify the script — language, likely origin, subject matter — from
-traffic analysis alone, before CCL is applied.
-
-**The construction:** Keyed Fisher-Yates shuffle of 62,584 eligible Unicode
-code points, seeded from SHA256(P). Each token value V maps to
-`shuffled_candidates[V]`. 1:1 bijection — no expansion.
+can identify the script from traffic analysis alone.
 
 **Distinct from the Gloss layer:**
 
 | Layer | Purpose |
 |-------|---------|
 | Gloss | Entropy tool — restores CCL feasibility for high-codepoint scripts |
-| Symbol | Camouflage tool — masks script fingerprints in the token distribution |
+| Symbol | Camouflage tool — masks script fingerprints in token distribution |
 
 ```bash
-python symbol_twist.py twist   [--prime P | --verse-file F] [--ref ID]
+python symbol_twist.py twist   [--key-prime P | --key-verse FILE] [--ref ID]
 python symbol_twist.py untwist <infile>
+python symbol_twist.py info    <infile>
 ```
+
+---
+
+## haiku_twist.py
+
+The Haiku Machine. Generates deterministic, reversible haiku from a
+verse-derived prime. The format eats its own output.
+
+**Dedicated to Felix 'FX' Lindner (1975–2026).**
+*The signal strains, but never gone.*
+
+### Construction
+
+```
+verse -> prime P
+  forward digits  -> syllable count schedule  (digit mod 5 + 1)
+  reversed digits -> word selection within bin (SHA256-seeded)
+```
+
+For each word slot `i`:
+
+```
+s    = (P_digits_forward[i mod len(P)] mod 5) + 1   # syllable count [1-6]
+seed = SHA256(P_digits_reversed[i mod len(P)] : i : s)
+word = bins[s][seed mod len(bins[s])]
+```
+
+Syllable count is capped to the remaining syllables in the current line.
+The haiku always lands exactly on the 5-7-5 pattern.
+
+### The ouroboros
+
+```
+verse₁ → P₁ → haiku₁
+haiku₁ → (as verse) → P₂ → haiku₂
+haiku₂ → P₃ → haiku₃  ...
+```
+
+Each haiku is simultaneously the output of one prime and the seed for
+the next. The chain is deterministic and infinite.
+
+### Canonical test vector
+
+Verse (K1):
+```
+Factoring primes in the hot sun, I fought Entropy — and Entropy won.
+```
+
+The first verse of "Second Law Blues" by T. Darley — the poem dedicated
+to FX. K1 is the canonical CCL test prime throughout the Crowsong stack.
+The same prime generates both the canonical CCL test artifacts and the
+canonical haiku. The encoding eats its own attribution. This seemed
+appropriate.
+
+Canonical test haiku: `archive/haiku-canonical-001.txt`
+
+### Usage
+
+```bash
+python haiku_twist.py generate [--prime P] [--bins FILE] [--ref ID]
+python haiku_twist.py chain    [--steps N] [--bins FILE] [--output FILE]
+python haiku_twist.py verify   <artifact>  [--bins FILE]
+python haiku_twist.py decode   <artifact>
+```
+
+Requires `docs/cmudict/bins.json` (from `tools/cmudict/cmudict.py export`).
+
+### Quick start
+
+```bash
+# Build syllable bins (one-time)
+python tools/cmudict/cmudict.py fetch
+python tools/cmudict/cmudict.py export
+
+# Generate canonical test vector
+echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
+    python haiku_twist.py generate --bins docs/cmudict/bins.json --ref HAIKU-K1 \
+    > archive/haiku-canonical-001.txt
+
+# Verify
+python haiku_twist.py verify archive/haiku-canonical-001.txt \
+    --bins docs/cmudict/bins.json
+
+# Chain: 7 linked haiku (ouroboros)
+echo "Factoring primes in the hot sun, I fought Entropy — and Entropy won." | \
+    python haiku_twist.py chain --bins docs/cmudict/bins.json \
+        --steps 7 --output archive/haiku-chain-001.txt
+```
+
+### Artifact format
+
+```
+RSRC: BEGIN
+  TYPE:         haiku-twist
+  VERSION:      1
+  CORPUS:       bins.json
+  PATTERN:      5-7-5
+  SCHEDULE:     forward=syl(d mod 5 + 1), reversed=word-select(SHA256)
+  WORDS:        13
+  PRIME:        11527664883411634260504727650961...
+  SYLLABLES:    2 3 1 2 2 3 1 2 2 1 2 2 1
+  WORD-INDEX:   2:1847 3:4201 1:892 ...
+  GENERATED:    2026-04-06
+  DEDICATION:   Dedicated to Felix 'FX' Lindner (1975-2026).
+  VERSE:        Factoring primes in the hot sun, I fought Entropy...
+RSRC: END
+```
+
+The RSRC block carries the full generation trace. Deterministic reversal
+requires: prime, corpus (`bins.json`), syllable plan, word indices.
 
 ---
 
@@ -365,35 +405,32 @@ verse (any length, any Unicode)
     ▼ SHA256 of token stream (UTF-8)
     │   → 256-bit digest → ~77-digit integer N
     │
-    ▼ next_prime(N)              ← mnemonic.py boundary
-    │   prime P (77 digits)        (verse_to_prime.py packages the artifact)
+    ▼ next_prime(N)                  ← mnemonic.py boundary
+    │   prime P (77 digits)
     │
-    ├─ forward digits of P  →  CCL key schedule (ouroboros)   ← prime_twist.py
+    ├─ forward digits of P
+    │   ├─ CCL key schedule          ← prime_twist.py
+    │   └─ Syllable count schedule   ← haiku_twist.py
     │
-    └─ reversed digits of P →  Gloss alphabet permutation     ← gloss_twist.py
-    │
-    ▼ [optional] gloss_twist.py — base-52 pre-encoding
-    │   for Arabic/CJK/Hangul/Hebrew/Devanagari/Thai
-    │   output: ASCII letter range (65-122), all CCL bases feasible
-    │
-    ▼ [optional] symbol_twist.py — script fingerprint masking
-    │   bijection over 62,584 eligible code points
-    │
-    ▼ prime_twist.py — CCL base-switching
-    │   for each FDS token tᵢ:
-    │     digit d = P_digits[i mod len(P)]
-    │     base  b = d  if d ≥ 2 and b^width > tᵢ
-    │             = 10 otherwise (fallback)
-    │     output  = repr(tᵢ, base=b, width=5)
-    │     record  twist_map[i] = b
-    │
-    ▼ twisted FDS token stream
-        + RSRC block with PRIME and TWIST-MAP
-        → self-describing artifact
+    └─ reversed digits of P
+        ├─ Gloss alphabet permutation  ← gloss_twist.py
+        └─ Word selection seed         ← haiku_twist.py
+
+
+Encoding pipeline (FDS):
+    [optional] gloss_twist.py   — base-52 pre-encoding (non-Latin scripts)
+    [optional] symbol_twist.py  — script fingerprint camouflage
+    prime_twist.py              — CCL base-switching
+    → self-describing artifact with RSRC block
+
+Haiku pipeline:
+    haiku_twist.py generate     — 5-7-5 from prime + cmudict bins
+    haiku_twist.py chain        — ouroboros chain, N steps
+    → self-describing artifact with RSRC block
 ```
 
-Use `crowsong-advisor.py` to determine which optional layers to apply
-for a given input.
+Use `crowsong-advisor.py` to determine which encoding pipeline layers
+to apply for a given input.
 
 ---
 
@@ -401,8 +438,9 @@ for a given input.
 
 | Tool | Purpose |
 |------|---------|
-| `tools/mnemonic/mnemonic.py` | Shared library: primality, verse-to-prime construction |
+| `tools/mnemonic/mnemonic.py` | Shared library: primality, verse-to-prime |
 | `tools/mnemonic/crowsong-advisor.py` | Pipeline advisor with statistical analysis |
+| `tools/cmudict/cmudict.py` | CMU dict mirror; syllable bins for haiku_twist |
 | `tools/ucs-dec/ucs_dec_tool.py` | FDS encode / decode / frame / verify |
 | `tools/udhr/udhr.py` | UDHR multilingual corpus (37 languages, 20 scripts) |
 | `tools/primes/primes.py` | Primality testing and prime generation |
@@ -414,8 +452,8 @@ for a given input.
 
 | Document | Notes |
 |----------|-------|
-| `drafts/draft-darley-fds-ccl-prime-twist-00.txt` | Pre-normative CCL spec, including §8.5 per-script entropy results |
-| `docs/mnemonic/gloss-README.md` | Gloss layer design rationale and construction |
+| `drafts/draft-darley-fds-ccl-prime-twist-00.txt` | Pre-normative CCL spec |
+| `docs/mnemonic/gloss-README.md` | Gloss layer design rationale |
 | `docs/entropy-analysis.md` | Shannon entropy measurements across 20+ languages |
 | `docs/operator-worked-example.md` | Complete encode/camouflage/reveal by hand |
 | `docs/mnemonic-shamir-sketch.md` | Mnemonic Share Wrapping design sketch |
@@ -426,10 +464,11 @@ for a given input.
 
 Python 2.7+ / 3.x. No external dependencies.
 All tools import from `mnemonic.py` in the same directory.
+`haiku_twist.py` additionally requires `docs/cmudict/bins.json`.
 
 ## Licence
 
 MIT. See `../../LICENSE` and `../../LICENSES.md`.
 
-Data: digits of mathematical constants are not copyrightable.
-OEIS sequence identifiers used for reference only.
+*One prime. Two schedules. Infinite poems.*
+*Signal survives. 🦊🌻*
