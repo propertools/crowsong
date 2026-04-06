@@ -388,15 +388,17 @@ TEXTS = {
         "notes":        "6th edition. There is grandeur in this view of life.",
         "tags":         ["science", "english", "mnemonic-anchor"],
     },
-    "wittgenstein-tractatus": {
-        "gutenberg_id": 5740,
-        "url":          "https://www.gutenberg.org/files/5740/5740.txt",
-        "title":        "Tractatus Logico-Philosophicus",
-        "author":       "Ludwig Wittgenstein",
+    "principia-mathematica-i": {
+        "gutenberg_id": 78050,
+        "title":        "Principia Mathematica — Volume I",
+        "author":       "Alfred North Whitehead and Bertrand Russell",
         "language":     "en",
-        "region":       "Austria / England",
-        "notes":        "Ogden translation. The world is everything that is the case.",
-        "tags":         ["philosophy", "logic", "mathematics", "mnemonic-anchor"],
+        "region":       "England",
+        "notes":        "Volume 1 of 3. The proof that 1+1=2 appears on page 362. "
+                        "Volumes 2-3 not available on Gutenberg. The most ambitious "
+                        "attempt to derive all of mathematics from logic alone — "
+                        "and the most magnificent failure.",
+        "tags":         ["mathematics", "logic", "philosophy", "mnemonic-anchor"],
     },
     "stapledon-starmaker": {
         "gutenberg_id": None,
