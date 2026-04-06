@@ -170,6 +170,64 @@ python tools/mnemonic/prime_twist.py unstack /tmp/stacked.txt | \
 
 ---
 
+## How prime-twisting works
+
+Imagine you have a message encoded as a stream of five-digit decimal
+numbers — the FDS encoding. Something like:
+
+```
+00084 00104 00101 00032 00115 00105 00103 00110 00097 00108 ...
+```
+
+To a trained eye, this is recognisable. The values cluster in a
+predictable range. The entropy is low. A passive observer scanning
+for unusual traffic might notice it.
+
+CCL — the Channel Camouflage Layer — disguises this by re-encoding
+each token in a different numeric base, driven by a key.
+
+The key is a prime number. You derive the prime from something
+memorable: a line of poetry, a folk melody, a specific image. The
+prime's decimal digits become the key schedule — one digit per token,
+cycling through the prime's digits like a wheel (the ouroboros).
+
+For each token, the scheduled digit tells you which base to use:
+digit 5 means base 5, digit 8 means base 8, and so on. The token
+value is re-expressed in that base, still zero-padded to five digits.
+The output is still decimal digits — still valid FDS — but the
+distribution looks completely different.
+
+The result after three passes (CCL3), using three different verse-
+derived primes as keys:
+
+- The original 53 distinct token values become 375
+- Entropy rises from 4.78 to 8.37 bits/token
+- Statistical analysis cannot distinguish the output from AES-128
+  ciphertext
+
+Everything needed to reverse the operation — which base was used at
+each position — is recorded in the artifact's resource block (the
+twist-map). The receiver unstacks the passes in reverse order and
+recovers the original token stream exactly.
+
+The keys live nowhere until needed. Recite the verse. Derive the
+prime. Untwist the artifact. The signal was always there.
+
+CCL provides no cryptographic confidentiality — it raises the cost
+of passive attention, not the cost of active decryption. For
+confidentiality, encrypt before encoding. For camouflage, apply CCL
+after. The layers are independent and composable.
+
+![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
+
+*Figure: The prime-twist construction. The prime's digits drive a
+cyclic key schedule (the ouroboros). Each digit selects a candidate
+base; the feasibility rule applies the fallback; the twist-map
+records what actually happened. The twist-map — not the schedule —
+is authoritative for reversal.*
+
+---
+
 ## The CCL result
 
 Triple-pass prime-twist CCL on the canonical 534-token payload:
@@ -244,10 +302,9 @@ public mathematics that has existed for centuries.
 There is nothing preventing someone from carrying the entire Crowsong
 system across a border as a microdot on a tourist snapshot. On the
 other side: a git checkout, an old Android phone, an embedded Python
-interpreter, and the system is operational. The key shards come from a poem
-held in memory, a song on the radio, and a meme posted publicly years ago.
-
-The key material was already encoded in π before the operator was born.
+interpreter, and the system is operational. The keys come from a poem
+held in memory and a meme posted publicly years ago. The key material
+was already encoded in π before the operator was born.
 
 The adversary's options are:
 
