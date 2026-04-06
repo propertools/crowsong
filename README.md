@@ -296,7 +296,7 @@ Expected result: legible text.
 | **Start here (implementation)** | [drafts/draft-darley-fds-00.txt](drafts/draft-darley-fds-00.txt) |
 | **Architecture** | [drafts/draft-darley-crowsong-00.txt](drafts/draft-darley-crowsong-00.txt) |
 | **Trust layer** | [drafts/draft-darley-shard-bundle-00.txt](drafts/draft-darley-shard-bundle-00.txt) |
-| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt) |
+| **Content continuity** | [drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt]([drafts/meridian-protocol/draft-darley-meridian-protocol-01.txt](https://github.com/propertools/meridian-protocol/blob/main/draft-darley-meridian-protocol-01.txt)) |
 | **Design doctrine** | [docs/structural-principles.md](docs/structural-principles.md) |
 | **Full suite overview** | [docs/crowsong-suite-overview.md](docs/crowsong-suite-overview.md) |
 | **Long-horizon physical archival** | [docs/vesper-archive-protocol.md](docs/vesper-archive-protocol.md) |
