@@ -219,6 +219,10 @@ CCL provides no cryptographic confidentiality. It raises the cost of
 passive attention, not the cost of active decryption. Encrypt first if
 confidentiality is required. Apply CCL after. The layers are independent.
 
+For a complete step-by-step walkthrough of encoding, camouflage, reveal,
+and decode using only a Unicode table and a calculator, see
+[docs/operator-worked-example.md](docs/operator-worked-example.md).
+
 ![CCL prime-twist construction](docs/ccl-prime-twist-construction.png)
 
 ---
@@ -345,6 +349,7 @@ Expected result: legible text.
 | **Mnemonic key wrapping and CCL** | [docs/mnemonic-shamir-sketch.md](docs/mnemonic-shamir-sketch.md) |
 | **CCL full capability demo** | [demo/ccl_demo.sh](demo/ccl_demo.sh) |
 | **Canonical text corpus** | [tools/texts/README.md](tools/texts/README.md) |
+| **Operator worked example** | [docs/operator-worked-example.md](docs/operator-worked-example.md) |
 | **Threat model** | [THREAT-MODEL.md](THREAT-MODEL.md) |
 | **Regulatory status** | [EU_DECLARATION_OF_CONFORMITY.md](EU_DECLARATION_OF_CONFORMITY.md) |
 | **Roadmap** | [docs/crowsong-roadmap.md](docs/crowsong-roadmap.md) |
