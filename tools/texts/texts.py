@@ -388,17 +388,43 @@ TEXTS = {
         "notes":        "6th edition. There is grandeur in this view of life.",
         "tags":         ["science", "english", "mnemonic-anchor"],
     },
-    "principia-mathematica-i": {
-        "gutenberg_id": 78050,
-        "title":        "Principia Mathematica — Volume I",
-        "author":       "Alfred North Whitehead and Bertrand Russell",
+    "wells-time-machine": {
+        "gutenberg_id": 35,
+        "title":        "The Time Machine",
+        "author":       "H.G. Wells",
         "language":     "en",
         "region":       "England",
-        "notes":        "Volume 1 of 3. The proof that 1+1=2 appears on page 362. "
-                        "Volumes 2-3 not available on Gutenberg. The most ambitious "
-                        "attempt to derive all of mathematics from logic alone — "
-                        "and the most magnificent failure.",
-        "tags":         ["mathematics", "logic", "philosophy", "mnemonic-anchor"],
+        "notes":        "The first great time travel story. The Eloi and the Morlocks.",
+        "tags":         ["literature", "science-fiction", "english"],
+    },
+    "kafka-metamorphosis": {
+        "gutenberg_id": 5200,
+        "title":        "Metamorphosis",
+        "author":       "Franz Kafka",
+        "language":     "en",
+        "region":       "Czech Republic / Austria",
+        "notes":        "Wyllie translation. As Gregor Samsa awoke one morning from "
+                        "uneasy dreams he found himself transformed into a gigantic insect.",
+        "tags":         ["literature", "german", "novella", "mnemonic-anchor"],
+    },
+    "ibn-battuta-travels": {
+        "gutenberg_id": 37279,
+        "title":        "Travels in Asia and Africa (selections)",
+        "author":       "Ibn Battuta",
+        "language":     "en",
+        "region":       "Morocco / global",
+        "notes":        "Gibb translation. The greatest medieval traveller — covered "
+                        "75,000 miles across the Islamic world, Africa, and Asia.",
+        "tags":         ["travel", "arabic", "history"],
+    },
+    "poe-tales": {
+        "gutenberg_id": 2148,
+        "title":        "Tales of Mystery and Imagination",
+        "author":       "Edgar Allan Poe",
+        "language":     "en",
+        "region":       "USA",
+        "notes":        "True — nervous — very, very dreadfully nervous I had been.",
+        "tags":         ["literature", "english", "short-fiction", "mnemonic-anchor"],
     },
     "stapledon-starmaker": {
         "gutenberg_id": None,
