@@ -1154,7 +1154,7 @@ indistinguishable from an in-place twist of the same base. The walk
 is fully deterministic from the seed prime P₀ and requires no
 additional key material.
 
-**Spec:** `docs/draft-darley-fds-ccl-prime-chain-00.txt` (pre-normative)
+**Spec:** `drafts/draft-darley-fds-ccl-prime-chain-00.md` (pre-normative)
 
 **Fix:** Implement `prime-chain/1` as a new `--schedule` option in
 `prime_twist.py`, alongside the existing `standard` and `mod3` schedules.
