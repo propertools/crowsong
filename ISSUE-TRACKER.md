@@ -1125,6 +1125,164 @@ to use the correct manual pipeline shown later in the document.
 
 ---
 
+### PRIME-CHAIN-002 — VALUE-SPACE EXPANDER: Gloss variant for WIDTH/3 BINARY entropy ceiling attack
+| Field    | Value |
+|----------|-------|
+| Severity | medium |
+| Status   | open |
+| Claimed  | — |
+| Opened   | 2026-04-07 |
+| Closed   | — |
+| Commit   | — |
+
+**Background:**
+
+WIDTH/3 BINARY + mod3 CCL achieves H_post = 8.87–8.93 bits/token
+across 37 languages and all compressors (Void's results, April 2026).
+The ceiling is not the algorithm — it is the input distribution.
+Compressed binary has 256 distinct byte values. After CCL, unique
+token count reaches ~643. The theoretical ceiling for a uniform
+distribution over 643 values is log₂(643) ≈ 9.33. The hard WIDTH/3
+ceiling is log₂(1000) = 9.97. The gap between current results and
+the hard ceiling is approximately 1 bit/token.
+
+**The insight:**
+
+The Gloss layer was designed to solve a structurally similar problem:
+CCL feasibility was capped by the input value distribution (CJK tokens
+clustered at high code points where few bases are feasible). The
+solution was a value-space re-encoding that moved tokens into a range
+where CCL could work effectively.
+
+For WIDTH/3 BINARY the problem is different but related: the output
+distribution is non-uniform across the 1000 possible token values
+(000–999). Closing the gap to the 9.97 ceiling requires making the
+distribution more uniform — more distinct token values, more evenly
+distributed.
+
+**Proposed construction: Gloss-W3 (working name)**
+
+A WIDTH/3-specific value-space expander, keyed from the same prime
+as CCL (reversed digits, same pattern as the existing Gloss layer):
+
+```
+compressed binary payload
+  → WIDTH/3 encode              (256 distinct values → tokens 000–255)
+  → Gloss-W3                    (value-space expansion, key = rev(P))
+  → prime-chain twist           (walk-based schedule, standard)
+  → mod3 CCL stack              (100% twist rate, bases 7/8/9)
+  → artifact
+```
+
+**Gloss-W3 construction:**
+
+The existing Gloss layer maps each token value V to a 3-token
+base-52 representation in the ASCII letter range (65–122). This
+*narrows* the value space (58 distinct values per output token vs
+256 input values) and is therefore wrong for this use case.
+
+Gloss-W3 instead maps each WIDTH/3 input token (000–255) to a
+deterministically selected token in the range 000–999, using a
+keyed permutation of the full WIDTH/3 token space:
+
+```
+key ← reversed digits of prime P (same as Gloss layer pattern)
+permutation ← Fisher-Yates shuffle of [000..999] seeded from SHA256(key)
+Gloss-W3(V) = permutation[V]
+```
+
+Properties:
+- Bijection from {000..255} → {000..999} (injective, not surjective)
+- Keyed: different primes produce different permutations
+- Reversal: inverse permutation, trivially computable from key
+- Value-space: 256 input values now occupy 256 positions scattered
+  across the full 000–999 range, rather than clustered at 000–255
+- Distribution: the 256 selected positions are determined by the key,
+  not by the byte values — positions are pseudo-random across 000–999
+
+After Gloss-W3, the token stream still has 256 distinct values, but
+they are distributed across the full WIDTH/3 space rather than
+clustered at the low end. CCL mod3 then applies to a distribution
+that is already spread across the full token vocabulary.
+
+**Why this might raise the ceiling:**
+
+mod3 CCL re-expresses each token in base 7, 8, or 9. The output
+value of a token T expressed in base b is a function of both T and b.
+If input tokens are clustered at 000–255, the output values after
+base conversion are also clustered — high values (256–999) are
+underrepresented in the output even after CCL. If input tokens are
+scattered across 000–999 via Gloss-W3, the output after base
+conversion is more uniformly distributed across the full WIDTH/3
+output vocabulary.
+
+The hypothesis: Gloss-W3 + prime-chain + mod3 pushes unique token
+count beyond 643 and H_post meaningfully above 8.93, toward the
+9.97 ceiling.
+
+**What to measure:**
+
+Add to `scripts/w3-entropy-bench.sh`:
+
+```bash
+# Pipeline variant: Gloss-W3 + prime-chain + mod3
+cat compressed_payload \
+    | python tools/ucs-dec/ucs_dec_tool.py --encode --binary \
+    | python tools/mnemonic/gloss_twist.py gloss-w3 \
+        --verse verses.txt \
+    | python tools/mnemonic/prime_twist.py stack \
+        --verse-file verses.txt \
+        --schedule prime-chain \
+    | python tools/mnemonic/prime_twist.py stack \
+        --verse-file verses.txt \
+        --schedule mod3 --width 3 \
+    > artifact.txt
+```
+
+Report H_post, unique token count post-CCL, and delta vs baseline
+mod3 results. Run across the same 37-language UDHR PDF corpus as
+Void's original benchmark.
+
+**Acceptance criterion:**
+
+H_post > 8.93 bits/token on at least one compressor/language
+combination, with unique token count > 643. If the hypothesis is
+correct, results should cluster above the current ceiling across
+most of the corpus.
+
+**Implementation required:**
+
+1. `gloss_twist.py`: add `gloss-w3` subcommand
+   - `Fisher-Yates permutation of [0..999] seeded from SHA256(rev(P))`
+   - `gloss-w3` and `ungloss-w3` subcommands
+   - RSRC block: `LAYER: gloss-w3/1`
+
+2. `prime_twist.py`: implement `prime-chain/1` schedule
+   (see PRIME-CHAIN-001)
+
+3. `w3-entropy-bench.sh`: add Gloss-W3 + prime-chain + mod3 pipeline
+   variant alongside existing benchmarks
+
+**Note for Void:**
+
+This is the next research direction after the WIDTH/3 mod3 results.
+The current ceiling (~8.93) is real and bounded by input distribution,
+not algorithm. Gloss-W3 is the proposed mechanism to attack that
+ceiling by spreading the input distribution across the full WIDTH/3
+token vocabulary before CCL runs. Prime-chain is the proposed
+mechanism to make the per-position schedule less characterisable.
+The combination has not been empirically tested. This issue captures
+the design so the hypothesis can be evaluated.
+
+The key insight: same structural pattern as the existing Gloss layer
+(reversed prime digits → keyed permutation → value-space
+transformation), applied to the WIDTH/3 domain instead of the
+WIDTH/5 non-Latin script domain. One design pattern, two applications.
+
+**Blocking:** PRIME-CHAIN-001 (prime-chain schedule implementation)
+
+---
+
 ## prime_twist.py — prime-chain schedule
 
 ### PRIME-CHAIN-001 — Implement prime-chain/1 schedule variant
@@ -1154,7 +1312,7 @@ indistinguishable from an in-place twist of the same base. The walk
 is fully deterministic from the seed prime P₀ and requires no
 additional key material.
 
-**Spec:** `drafts/draft-darley-fds-ccl-prime-chain-00.md` (pre-normative)
+**Spec:** `docs/ccl-prime-chain-spec.md` (pre-normative)
 
 **Fix:** Implement `prime-chain/1` as a new `--schedule` option in
 `prime_twist.py`, alongside the existing `standard` and `mod3` schedules.
