@@ -1125,6 +1125,60 @@ to use the correct manual pipeline shown later in the document.
 
 ---
 
+## prime_twist.py — prime-chain schedule
+
+### PRIME-CHAIN-001 — Implement prime-chain/1 schedule variant
+| Field    | Value |
+|----------|-------|
+| Severity | medium |
+| Status   | open |
+| Claimed  | — |
+| Opened   | 2026-04-07 |
+| Closed   | — |
+| Commit   | — |
+
+**Description:** The standard CCL schedule wastes ~20% of key schedule
+positions — digits 0 and 1 fall back to base 10 and produce no twist.
+The prime-chain schedule repurposes these digits as prime hop triggers:
+
+- `d = 0` → hop to next_prime(Pₐ); draw base from destination prime's
+  digit at current position; apply twist; update active prime
+- `d = 1` → hop to prev_prime(Pₐ) (subject to floor rule); draw base
+  from destination prime's digit at current position; apply twist;
+  update active prime
+- `d = 2–9` → twist in place using current prime, base = d (as standard)
+
+Every digit drives real work. Hop positions are invisible in the
+twist-map — the base drawn from the destination prime is
+indistinguishable from an in-place twist of the same base. The walk
+is fully deterministic from the seed prime P₀ and requires no
+additional key material.
+
+**Spec:** `docs/ccl-prime-chain-spec.md` (pre-normative)
+
+**Fix:** Implement `prime-chain/1` as a new `--schedule` option in
+`prime_twist.py`, alongside the existing `standard` and `mod3` schedules.
+
+Required additions to `prime_twist.py`:
+- `prev_prime(n)` function (symmetric to `next_prime`)
+- `WALK_FLOOR` constant (smallest prime > 2^255)
+- `_chain_schedule_step(Pa, pos)` → (base, new_Pa)
+- `stack --schedule prime-chain` support
+- RSRC block: `SCHEDULE: prime-chain/1`
+
+Required additions to `mnemonic.py`:
+- `prev_prime(n)` export (mirrors `next_prime`)
+
+**Canonical test vector:** to be generated after implementation using
+K1 verse and `archive/second-law-blues.txt`. Commit to
+`archive/second-law-blues-prime-chain.txt`.
+
+**Verification:** roundtrip test — encode with prime-chain/1, decode,
+diff against original. CRC32 must match. Walk must be deterministic
+across two independent implementations.
+
+---
+
 ## Pipeline composability (stdin / stdout / tee)
 
 The Crowsong toolchain is designed to be composable via Unix pipelines.
