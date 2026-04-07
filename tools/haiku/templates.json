@@ -1,0 +1,660 @@
+{
+  "_meta": {
+    "version": "1",
+    "name": "haiku-templates-v1",
+    "description": "POS template library for grammatically coherent, eerily plausible AI-style English nature haiku. Templates are drawn from analysis of actual haiku structure (Basho, Issa, Buson) and their 2022-2024 AI imitations. Each template is a sequence of (POS_tag, syllable_count) slots summing to 5-7-5. Templates are versioned — reversal requires the same template library used during encoding.",
+    "template_count": 48,
+    "pos_tags": {
+      "NN":  "noun, singular",
+      "NNS": "noun, plural",
+      "NNP": "proper noun",
+      "JJ":  "adjective",
+      "JJR": "adjective, comparative",
+      "VB":  "verb, base form",
+      "VBZ": "verb, 3rd person singular present",
+      "VBG": "verb, gerund/present participle",
+      "VBN": "verb, past participle",
+      "VBD": "verb, past tense",
+      "RB":  "adverb",
+      "IN":  "preposition or subordinating conjunction",
+      "DT":  "determiner",
+      "PRP": "personal pronoun",
+      "PRP$":"possessive pronoun",
+      "CC":  "coordinating conjunction",
+      "CD":  "cardinal number",
+      "EX":  "existential there"
+    },
+    "syllable_sum_check": "each template must sum to [5, 7, 5] per line",
+    "generated": "2026-04-07",
+    "tool": "tools/haiku/haiku_grammar.py (Proper Tools SRL)",
+    "note": "Template selection is driven by forward digits of the prime key. Within each template, word selection uses the reversed digits — the same structural pattern as the Gloss layer. One prime, two schedules, zero additional key material."
+  },
+
+  "templates": [
+
+    {
+      "id": "T001",
+      "name": "imagist-classic",
+      "description": "Two-image structure. The gold standard of haiku. Image / juxtaposition / image.",
+      "ai_likelihood": "very high",
+      "example": "golden leaves falling / the river asks nothing of / the darkening sky",
+      "lines": [
+        [["JJ",2], ["NNS",3]],
+        [["DT",1], ["NN",2], ["VBZ",1], ["NN",1], ["IN",2]],
+        [["DT",1], ["VBG",2], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T002",
+      "name": "gerund-opening",
+      "description": "Opens with a gerund — extremely common in AI haiku. Action / observation / stillness.",
+      "ai_likelihood": "very high",
+      "example": "falling through the grey / a single leaf finds the ground / silence after",
+      "lines": [
+        [["VBG",2], ["IN",1], ["DT",1], ["JJ",1]],
+        [["DT",1], ["JJ",1], ["NN",1], ["VBZ",2], ["DT",1], ["NN",1]],
+        [["NN",2], ["RB",3]]
+      ]
+    },
+
+    {
+      "id": "T003",
+      "name": "the-noun-stack",
+      "description": "Pure noun accumulation — no verbs, creates a list-like image. Very haiku, very AI.",
+      "ai_likelihood": "high",
+      "example": "stone / cold water / morning light / the heron still / broken reed",
+      "lines": [
+        [["NN",2], ["NN",3]],
+        [["JJ",1], ["NN",2], ["JJ",1], ["NN",3]],
+        [["JJ",2], ["NN",3]]
+      ]
+    },
+
+    {
+      "id": "T004",
+      "name": "subject-verb-image",
+      "description": "Simple subject-verb sentence followed by an image. The most prose-like template.",
+      "ai_likelihood": "high",
+      "example": "the old crow waits / on the broken winter fence / snow falls anyway",
+      "lines": [
+        [["DT",1], ["JJ",1], ["NN",1], ["VBZ",2]],
+        [["IN",1], ["DT",1], ["JJ",1], ["NN",1], ["NN",2]],
+        [["NN",1], ["VBZ",1], ["RB",3]]
+      ]
+    },
+
+    {
+      "id": "T005",
+      "name": "season-turn",
+      "description": "Seasonal image / shift / consequence. The classical kigo structure.",
+      "ai_likelihood": "high",
+      "example": "first autumn wind / the leaves do not know yet / they are already gone",
+      "lines": [
+        [["JJ",1], ["JJ",1], ["NN",3]],
+        [["DT",1], ["NNS",1], ["VB",1], ["RB",1], ["VB",1], ["RB",1]],
+        [["PRP",1], ["VBP",1], ["RB",1], ["JJ",2]]
+      ]
+    },
+
+    {
+      "id": "T006",
+      "name": "prepositional-meditation",
+      "description": "Preposition-heavy. The 'through / beneath / within' structure beloved of AI haiku generators.",
+      "ai_likelihood": "very high",
+      "example": "through the bare branches / something moves that has no name / into the dark",
+      "lines": [
+        [["IN",1], ["DT",1], ["JJ",1], ["NNS",2]],
+        [["NN",2], ["VBZ",1], ["WDT",1], ["VBZ",1], ["DT",1], ["NN",1]],
+        [["IN",1], ["DT",1], ["JJ",2]]
+      ]
+    },
+
+    {
+      "id": "T007",
+      "name": "past-participle-opener",
+      "description": "Opens with a past participle — creates a sense of something already done.",
+      "ai_likelihood": "high",
+      "example": "forgotten garden / the gate still holds its silence / rust on the latch",
+      "lines": [
+        [["VBN",3], ["NN",2]],
+        [["DT",1], ["NN",1], ["RB",1], ["VBZ",1], ["PRP$",1], ["NN",3]],
+        [["NN",1], ["IN",1], ["DT",1], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T008",
+      "name": "the-lone-witness",
+      "description": "Single subject watching or being watched. The solitude template.",
+      "ai_likelihood": "high",
+      "example": "one crow on the wire / watching the grey afternoon / neither moves",
+      "lines": [
+        [["CD",1], ["NN",1], ["IN",1], ["DT",1], ["NN",2]],
+        [["VBG",2], ["DT",1], ["JJ",1], ["NN",3]],
+        [["RB",2], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T009",
+      "name": "negation-structure",
+      "description": "Contains a negation — 'no', 'not', 'nothing'. Creates absence. Very AI.",
+      "ai_likelihood": "very high",
+      "example": "no wind this morning / the pond holds everything still / nothing is moving",
+      "lines": [
+        [["DT",1], ["NN",1], ["DT",1], ["NN",3]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["NN",3], ["RB",1]],
+        [["NN",2], ["VBZ",1], ["VBG",2]]
+      ]
+    },
+
+    {
+      "id": "T010",
+      "name": "time-marker-opening",
+      "description": "Opens with a time reference. Classic haiku grounding technique.",
+      "ai_likelihood": "high",
+      "example": "late autumn morning / the dogs have stopped their barking / frost on the window",
+      "lines": [
+        [["JJ",1], ["JJ",2], ["NN",2]],
+        [["DT",1], ["NNS",1], ["VBP",1], ["VBN",1], ["PRP$",1], ["VBG",2]],
+        [["NN",1], ["IN",1], ["DT",1], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T011",
+      "name": "colour-noun-verb",
+      "description": "Colour adjective / noun / simple verb. The Instagram haiku.",
+      "ai_likelihood": "very high",
+      "example": "pale grey morning light / falls across the empty floor / something remembers",
+      "lines": [
+        [["JJ",1], ["JJ",1], ["NN",2], ["NN",1]],
+        [["VBZ",1], ["IN",1], ["DT",1], ["JJ",2], ["NN",1]],
+        [["NN",2], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T012",
+      "name": "the-questions-unanswered",
+      "description": "Implied question with no answer. Creates unease. AI haiku hallmark.",
+      "ai_likelihood": "very high",
+      "example": "who left this candle / burning in the winter room / the door stands open",
+      "lines": [
+        [["WP",1], ["VBD",1], ["DT",1], ["NN",2]],
+        [["VBG",2], ["IN",1], ["DT",1], ["NN",1], ["NN",1]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["JJ",2]]
+      ]
+    },
+
+    {
+      "id": "T013",
+      "name": "body-and-world",
+      "description": "The human body in relation to nature. Embodiment haiku.",
+      "ai_likelihood": "medium",
+      "example": "my breath in cold air / the mountain does not notice / I am also small",
+      "lines": [
+        [["PRP$",1], ["NN",1], ["IN",1], ["JJ",1], ["NN",1]],
+        [["DT",1], ["NN",2], ["VBZ",1], ["RB",1], ["VB",2]],
+        [["PRP",1], ["VBP",1], ["RB",1], ["JJ",2]]
+      ]
+    },
+
+    {
+      "id": "T014",
+      "name": "the-still-life",
+      "description": "Objects described without movement. The Dutch masters as haiku.",
+      "ai_likelihood": "medium",
+      "example": "cold cup on the sill / a book left open to rain / the afternoon light",
+      "lines": [
+        [["JJ",1], ["NN",1], ["IN",1], ["DT",1], ["NN",1]],
+        [["DT",1], ["NN",1], ["VBN",1], ["JJ",1], ["IN",1], ["NN",1]],
+        [["DT",1], ["NN",2], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T015",
+      "name": "comparative-turn",
+      "description": "Uses a comparison, implicit or explicit. Creates depth.",
+      "ai_likelihood": "medium",
+      "example": "quieter than snow / the moment before you speak / I hold my breath still",
+      "lines": [
+        [["JJR",3], ["IN",1], ["NN",1]],
+        [["DT",1], ["NN",2], ["IN",1], ["PRP",1], ["VB",1]],
+        [["PRP",1], ["VB",1], ["PRP$",1], ["NN",1], ["RB",1]]
+      ]
+    },
+
+    {
+      "id": "T016",
+      "name": "the-remembered",
+      "description": "Past tense / memory structure. The nostalgia template.",
+      "ai_likelihood": "high",
+      "example": "you used to say that / the autumn always returns / I forget which year",
+      "lines": [
+        [["PRP",1], ["VBD",1], ["TO",1], ["VB",1], ["DT",1]],
+        [["DT",1], ["NN",2], ["RB",1], ["VBZ",2]],
+        [["PRP",1], ["VB",1], ["WDT",1], ["NN",1]]
+      ]
+    },
+
+    {
+      "id": "T017",
+      "name": "nothing-and-everything",
+      "description": "The grand abstraction with a concrete anchor. AI haiku overcorrecting.",
+      "ai_likelihood": "very high",
+      "example": "everything is still / the pond holds all the morning / a frog waits below",
+      "lines": [
+        [["NN",4], ["VBZ",1]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["DT",1], ["DT",1], ["NN",2]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["RB",2]]
+      ]
+    },
+
+    {
+      "id": "T018",
+      "name": "season-word-pivot",
+      "description": "The kigo pivot — season word / action / consequence.",
+      "ai_likelihood": "high",
+      "example": "first snow of winter / children have already gone / the yard holds their prints",
+      "lines": [
+        [["JJ",1], ["NN",1], ["IN",1], ["NN",2]],
+        [["NNS",2], ["VBP",1], ["RB",2], ["VBN",1]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["PRP$",1], ["NNS",1]]
+      ]
+    },
+
+    {
+      "id": "T019",
+      "name": "adjective-noun-silence",
+      "description": "Two adjective-noun pairs with a verb of being or silence.",
+      "ai_likelihood": "high",
+      "example": "pale morning / cold stone / the river does not speak / it simply runs",
+      "lines": [
+        [["JJ",1], ["NN",1], ["JJ",1], ["NN",2]],
+        [["DT",1], ["NN",2], ["VBZ",1], ["RB",1], ["VB",1]],
+        [["PRP",1], ["RB",1], ["VBZ",2]]
+      ]
+    },
+
+    {
+      "id": "T020",
+      "name": "the-approach",
+      "description": "Something arriving, coming closer. Anticipation.",
+      "ai_likelihood": "medium",
+      "example": "before the rain comes / the birds stop their singing first / then the silence fills",
+      "lines": [
+        [["IN",1], ["DT",1], ["NN",1], ["VBZ",1]],
+        [["DT",1], ["NNS",1], ["VB",1], ["PRP$",1], ["VBG",2], ["RB",1]],
+        [["RB",1], ["DT",1], ["NN",2], ["VBZ",1]]
+      ]
+    },
+
+    {
+      "id": "T021",
+      "name": "deep-image",
+      "description": "Two images with no explicit connection. Forces the reader to make the leap.",
+      "ai_likelihood": "medium",
+      "example": "the rusted gate latch / a child's shoe in the garden / evening comes early",
+      "lines": [
+        [["DT",1], ["VBN",2], ["NN",1], ["NN",1]],
+        [["DT",1], ["NN",1], ["NN",1], ["IN",1], ["DT",1], ["NN",2]],
+        [["NN",2], ["VBZ",1], ["RB",2]]
+      ]
+    },
+
+    {
+      "id": "T022",
+      "name": "the-instruction",
+      "description": "Imperative mode — the haiku that tells you what to do. Rare in classical, common in AI.",
+      "ai_likelihood": "high",
+      "example": "listen to the rain / let it say what it needs to / then let it be still",
+      "lines": [
+        [["VB",2], ["IN",1], ["DT",1], ["NN",1]],
+        [["VB",1], ["PRP",1], ["VB",1], ["WP",1], ["PRP",1], ["VBZ",1], ["TO",1]],
+        [["RB",1], ["VB",1], ["PRP",1], ["VB",1], ["JJ",1]]
+      ]
+    },
+
+    {
+      "id": "T023",
+      "name": "the-inventory",
+      "description": "Listing without hierarchy. The haiku as catalogue.",
+      "ai_likelihood": "medium",
+      "example": "snow / an open gate / the smell of the neighbour's fire / nothing moving",
+      "lines": [
+        [["NN",1], ["DT",1], ["JJ",1], ["NN",3]],
+        [["DT",1], ["NN",1], ["IN",1], ["DT",1], ["NN",2], ["NN",1]],
+        [["NN",2], ["VBG",3]]
+      ]
+    },
+
+    {
+      "id": "T024",
+      "name": "conditional-haiku",
+      "description": "If-clause structure. The philosophical AI haiku.",
+      "ai_likelihood": "medium",
+      "example": "if the stone could speak / it would tell us about rain / we already know",
+      "lines": [
+        [["IN",1], ["DT",1], ["NN",1], ["MD",1], ["VB",1]],
+        [["PRP",1], ["MD",1], ["VB",1], ["PRP",1], ["IN",1], ["NN",1]],
+        [["PRP",1], ["RB",1], ["VBP",1]]
+      ]
+    },
+
+    {
+      "id": "T025",
+      "name": "verb-heavy",
+      "description": "Multiple verbs, little punctuation. Creates motion.",
+      "ai_likelihood": "medium",
+      "example": "the wind lifts and turns / the leaves follow then let go / the branch remembers",
+      "lines": [
+        [["DT",1], ["NN",1], ["VBZ",1], ["CC",1], ["VBZ",1]],
+        [["DT",1], ["NNS",1], ["VB",1], ["RB",1], ["VB",1], ["VB",1]],
+        [["DT",1], ["NN",1], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T026",
+      "name": "the-precise-detail",
+      "description": "One very specific image. The haiku that earns its moment.",
+      "ai_likelihood": "medium",
+      "example": "the third step creaks / she always avoided it / the house still listens",
+      "lines": [
+        [["DT",1], ["JJ",1], ["NN",1], ["VBZ",2]],
+        [["PRP",1], ["RB",1], ["VBD",2], ["PRP",1]],
+        [["DT",1], ["NN",1], ["RB",1], ["VBZ",2]]
+      ]
+    },
+
+    {
+      "id": "T027",
+      "name": "the-pivot-line",
+      "description": "Line 2 belongs to both line 1 and line 3. The kireji pivot.",
+      "ai_likelihood": "medium",
+      "example": "morning fog / lifting from the river / birds begin their work",
+      "lines": [
+        [["NN",2], ["NN",3]],
+        [["VBG",2], ["IN",1], ["DT",1], ["NN",2]],
+        [["NNS",1], ["VB",1], ["PRP$",1], ["NN",1]]
+      ]
+    },
+
+    {
+      "id": "T028",
+      "name": "the-plain-observation",
+      "description": "No metaphor. Just a thing happening. The hardest kind to write, the easiest to fake.",
+      "ai_likelihood": "high",
+      "example": "the cat sits in sun / on the kitchen windowsill / its eyes are closing",
+      "lines": [
+        [["DT",1], ["NN",1], ["VBZ",1], ["IN",1], ["NN",1]],
+        [["IN",1], ["DT",1], ["NN",1], ["NN",3]],
+        [["PRP$",1], ["NNS",1], ["VBP",1], ["VBG",2]]
+      ]
+    },
+
+    {
+      "id": "T029",
+      "name": "the-already-gone",
+      "description": "Past perfect or past progressive — the thing was happening and is done.",
+      "ai_likelihood": "high",
+      "example": "they had been laughing / long before the snow arrived / no one remembers",
+      "lines": [
+        [["PRP",1], ["VBD",1], ["VBN",1], ["VBG",2]],
+        [["JJ",1], ["IN",1], ["DT",1], ["NN",1], ["VBD",2]],
+        [["DT",1], ["NN",1], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T030",
+      "name": "two-nouns-one-verb",
+      "description": "Subject and object with a single precise verb. Economy.",
+      "ai_likelihood": "medium",
+      "example": "the river / carries / what the mountain / releases / to the sea",
+      "lines": [
+        [["DT",1], ["NN",1], ["VBZ",3]],
+        [["WP",1], ["DT",1], ["NN",2], ["VBZ",3]],
+        [["IN",1], ["DT",1], ["NN",3]]
+      ]
+    },
+
+    {
+      "id": "T031",
+      "name": "the-interior-weather",
+      "description": "External nature / internal state / return to nature. The emotion buried in landscape.",
+      "ai_likelihood": "very high",
+      "example": "cold rain on the roof / I cannot say what I mean / the rain continues",
+      "lines": [
+        [["JJ",1], ["NN",1], ["IN",1], ["DT",1], ["NN",1]],
+        [["PRP",1], ["MD",1], ["RB",1], ["VB",1], ["WP",1], ["PRP",1], ["VBP",1]],
+        [["DT",1], ["NN",1], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T032",
+      "name": "the-name-withheld",
+      "description": "Refers to someone without naming them. Intimacy and distance.",
+      "ai_likelihood": "medium",
+      "example": "she left the window / open the way she always did / I closed it at last",
+      "lines": [
+        [["PRP",1], ["VBD",1], ["DT",1], ["NN",2]],
+        [["JJ",1], ["DT",1], ["NN",1], ["PRP",1], ["RB",1], ["VBD",1]],
+        [["PRP",1], ["VBD",1], ["PRP",1], ["IN",1], ["JJ",1]]
+      ]
+    },
+
+    {
+      "id": "T033",
+      "name": "existential-pivot",
+      "description": "Statement of existence / complication / resolution or dissolution.",
+      "ai_likelihood": "very high",
+      "example": "there is a moment / between the last light and dark / that belongs to no one",
+      "lines": [
+        [["EX",1], ["VBZ",1], ["DT",1], ["NN",2]],
+        [["IN",1], ["DT",1], ["JJ",1], ["NN",1], ["CC",1], ["JJ",1]],
+        [["WDT",1], ["VBZ",2], ["IN",1], ["DT",1], ["NN",1]]
+      ]
+    },
+
+    {
+      "id": "T034",
+      "name": "the-verb-of-light",
+      "description": "Light doing something — shining, falling, breaking. High AI frequency.",
+      "ai_likelihood": "very high",
+      "example": "winter light falling / across the kitchen table / nobody is home",
+      "lines": [
+        [["NN",2], ["NN",1], ["VBG",2]],
+        [["IN",1], ["DT",1], ["NN",2], ["NN",2]],
+        [["NN",3], ["VBZ",1], ["JJ",1]]
+      ]
+    },
+
+    {
+      "id": "T035",
+      "name": "the-small-animal",
+      "description": "A small creature as witness or actor. Basho's frog, basically.",
+      "ai_likelihood": "high",
+      "example": "the sparrow does not / know that winter is coming / it finds another seed",
+      "lines": [
+        [["DT",1], ["NN",2], ["VBZ",1], ["RB",1]],
+        [["VB",1], ["IN",1], ["NN",2], ["VBZ",2]],
+        [["PRP",1], ["VBZ",1], ["DT",1], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T036",
+      "name": "three-nouns",
+      "description": "Three nouns, one per line, almost. Minimalist. Creates white space.",
+      "ai_likelihood": "medium",
+      "example": "stone / silence / the moon asks nothing",
+      "lines": [
+        [["NN",1], ["NN",1], ["NN",3]],
+        [["NN",2], ["NN",1], ["NN",2]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T037",
+      "name": "the-return",
+      "description": "Something coming back — seasons, people, birds, light.",
+      "ai_likelihood": "high",
+      "example": "the geese return south / the same sky but not the same / I have changed also",
+      "lines": [
+        [["DT",1], ["NNS",1], ["VB",1], ["JJ",1]],
+        [["DT",1], ["JJ",1], ["NN",1], ["CC",1], ["RB",1], ["DT",1], ["JJ",1]],
+        [["PRP",1], ["VBP",1], ["VBN",1], ["RB",2]]
+      ]
+    },
+
+    {
+      "id": "T038",
+      "name": "the-transformation",
+      "description": "Something becoming something else. Change as subject.",
+      "ai_likelihood": "medium",
+      "example": "the puddle becomes / a mirror for the grey sky / then the wind erases",
+      "lines": [
+        [["DT",1], ["NN",2], ["VBZ",2]],
+        [["DT",1], ["NN",2], ["IN",1], ["DT",1], ["JJ",1], ["NN",1]],
+        [["RB",1], ["DT",1], ["NN",1], ["VBZ",3]]
+      ]
+    },
+
+    {
+      "id": "T039",
+      "name": "the-absence-room",
+      "description": "A space defined by what is missing from it.",
+      "ai_likelihood": "very high",
+      "example": "the empty garden / holds the shape of what was there / nothing grows in grief",
+      "lines": [
+        [["DT",1], ["JJ",2], ["NN",2]],
+        [["VBZ",1], ["DT",1], ["NN",1], ["IN",1], ["WP",1], ["VBD",1], ["RB",1]],
+        [["NN",2], ["VBZ",1], ["IN",1], ["NN",1]]
+      ]
+    },
+
+    {
+      "id": "T040",
+      "name": "the-hour",
+      "description": "A specific time of day as anchor. Morning and dusk dominate AI haiku.",
+      "ai_likelihood": "high",
+      "example": "four in the morning / the birds have not started yet / I have not slept",
+      "lines": [
+        [["CD",1], ["IN",1], ["DT",1], ["NN",3]],
+        [["DT",1], ["NNS",1], ["VBP",1], ["RB",1], ["VBN",1], ["RB",1]],
+        [["PRP",1], ["VBP",1], ["RB",1], ["VBN",1]]
+      ]
+    },
+
+    {
+      "id": "T041",
+      "name": "double-negation",
+      "description": "Two negatives creating a strange positive space.",
+      "ai_likelihood": "high",
+      "example": "not the wind / not the light / but the space between them / where nothing is named",
+      "lines": [
+        [["RB",1], ["DT",1], ["NN",1], ["RB",1], ["DT",1], ["NN",1]],
+        [["CC",1], ["DT",1], ["NN",1], ["IN",1], ["PRP",1]],
+        [["IN",1], ["NN",2], ["VBZ",1], ["VBN",2]]
+      ]
+    },
+
+    {
+      "id": "T042",
+      "name": "the-reader-addressed",
+      "description": "The haiku speaks to 'you'. Second person. AI haiku overuses this.",
+      "ai_likelihood": "very high",
+      "example": "you will not notice / the moment the light has changed / until it has gone",
+      "lines": [
+        [["PRP",1], ["MD",1], ["RB",1], ["VB",2]],
+        [["DT",1], ["NN",2], ["DT",1], ["NN",1], ["VBZ",2]],
+        [["IN",1], ["PRP",1], ["VBZ",1], ["VBN",1]]
+      ]
+    },
+
+    {
+      "id": "T043",
+      "name": "the-sound",
+      "description": "Acoustic haiku — something heard rather than seen.",
+      "ai_likelihood": "medium",
+      "example": "the sound of the rain / on the different surfaces / each one a small grief",
+      "lines": [
+        [["DT",1], ["NN",1], ["IN",1], ["DT",1], ["NN",1]],
+        [["IN",1], ["DT",1], ["JJ",2], ["NNS",2]],
+        [["DT",1], ["CD",1], ["DT",1], ["JJ",1], ["NN",1]]
+      ]
+    },
+
+    {
+      "id": "T044",
+      "name": "the-long-view",
+      "description": "Geological or historical time scale. The AI haiku that wants to be deep.",
+      "ai_likelihood": "high",
+      "example": "ten thousand winters / the stone has not moved an inch / we call this patience",
+      "lines": [
+        [["CD",1], ["JJ",2], ["NNS",2]],
+        [["DT",1], ["NN",1], ["VBZ",1], ["RB",1], ["VBN",1], ["DT",1], ["NN",1]],
+        [["PRP",1], ["VB",1], ["DT",1], ["NN",2]]
+      ]
+    },
+
+    {
+      "id": "T045",
+      "name": "the-threshold",
+      "description": "A liminal space — doorway, edge, surface, boundary.",
+      "ai_likelihood": "medium",
+      "example": "at the edge of sleep / something is being decided / the body lets go",
+      "lines": [
+        [["IN",1], ["DT",1], ["NN",1], ["IN",1], ["NN",1]],
+        [["NN",2], ["VBZ",1], ["VBN",1], ["VBN",3]],
+        [["DT",1], ["NN",2], ["VBZ",1], ["VB",1]]
+      ]
+    },
+
+    {
+      "id": "T046",
+      "name": "the-botanical",
+      "description": "Plant life as subject. The haiku of root and branch.",
+      "ai_likelihood": "medium",
+      "example": "the old plum tree / still blossoms in late winter / we do not deserve it",
+      "lines": [
+        [["DT",1], ["JJ",1], ["NN",1], ["NN",1]],
+        [["RB",1], ["VBZ",2], ["IN",1], ["JJ",1], ["NN",2]],
+        [["PRP",1], ["VBP",1], ["RB",1], ["VB",2], ["PRP",1]]
+      ]
+    },
+
+    {
+      "id": "T047",
+      "name": "the-self-aware",
+      "description": "The haiku that knows it is a haiku. Peak AI haiku energy.",
+      "ai_likelihood": "very high",
+      "example": "I tried to write it / the moment the light was there / by then it was gone",
+      "lines": [
+        [["PRP",1], ["VBD",1], ["TO",1], ["VB",1], ["PRP",1]],
+        [["DT",1], ["NN",2], ["DT",1], ["NN",1], ["VBD",1], ["RB",1]],
+        [["IN",1], ["RB",1], ["PRP",1], ["VBD",1], ["VBN",1]]
+      ]
+    },
+
+    {
+      "id": "T048",
+      "name": "the-kigo-pivot-modern",
+      "description": "Modern kigo — not cherry blossoms but wifi, screens, the digital season.",
+      "ai_likelihood": "high",
+      "example": "the screen goes dark first / then everything else follows / winter of the grid",
+      "lines": [
+        [["DT",1], ["NN",1], ["VBZ",1], ["JJ",1], ["RB",1]],
+        [["RB",1], ["NN",2], ["RB",1], ["VBZ",3]],
+        [["NN",2], ["IN",1], ["DT",1], ["NN",1]]
+      ]
+    }
+
+  ]
+}

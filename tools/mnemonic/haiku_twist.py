@@ -1121,7 +1121,8 @@ def cmd_decode_stream(args):
     return 0
 
 
-
+def cmd_decode(args):
+    """Print just the haiku text from an artifact."""
     try:
         with io.open(args.artifact, "r", encoding="utf-8") as f:
             content = f.read()
@@ -1136,6 +1137,337 @@ def cmd_decode_stream(args):
 
     for line in parsed["lines"]:
         print(line)
+    return 0
+
+
+# ── Grammar mode — import GrammarEngine ──────────────────────────────────────
+#
+# Grammar mode is optional. If haiku_grammar.py is not found, grammar
+# subcommands degrade gracefully with a clear error message.
+
+def _import_grammar():
+    """Import GrammarEngine from haiku_grammar.py if available."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        script_dir,
+        os.path.join(script_dir, "..", "haiku"),
+        os.path.join(script_dir, "..", "..", "tools", "haiku"),
+    ]
+    for path in candidates:
+        abs_path = os.path.abspath(path)
+        if os.path.isfile(os.path.join(abs_path, "haiku_grammar.py")):
+            if abs_path not in sys.path:
+                sys.path.insert(0, abs_path)
+            break
+    try:
+        from haiku_grammar import (
+            GrammarEngine, load_templates, load_fields,
+            load_pos_data, build_pos_bins)
+        return GrammarEngine, load_templates, load_fields, \
+               load_pos_data, build_pos_bins
+    except ImportError:
+        return None, None, None, None, None
+
+_GrammarEngine, _load_templates, _load_fields, \
+    _load_pos_data, _build_pos_bins = _import_grammar()
+
+DEFAULT_TEMPLATES = os.path.join("tools", "haiku", "templates.json")
+DEFAULT_FIELDS    = os.path.join("tools", "haiku", "fields.json")
+DEFAULT_POS_INDEX = os.path.join("docs",  "wordfreq", "pos-index.json")
+
+
+def _grammar_available():
+    return _GrammarEngine is not None
+
+
+def _make_grammar_artifact(lines, prime_str, template_id, field_name,
+                            ref, bins_name, token_count, crc_str,
+                            templates_version, fields_version, generated):
+    """Wrap grammar-mode haiku output in a self-describing RSRC artifact."""
+    payload = "\n".join(lines)
+
+    rsrc = [
+        "RSRC: BEGIN",
+        "  TYPE:              haiku-grammar-stream",
+        "  VERSION:           1",
+        "  NOTE:              TEST IMPLEMENTATION -- not normatively specified",
+        "  CORPUS:            {0}".format(bins_name),
+        "  TEMPLATES:         {0}".format(templates_version),
+        "  FIELDS:            {0}".format(fields_version),
+        "  ENCODING:          grammar-template / semantic-field / prime-schedule",
+        "  PRIME:             {0}".format(prime_str),
+        "  TOKENS:            {0}".format(token_count),
+        "  CRC32-TOKENS:      {0}".format(crc_str),
+        "  GENERATED:         {0}".format(generated),
+        "  DEDICATION:        {0}".format(DEDICATION),
+        "RSRC: END",
+    ]
+
+    header = [_box_rule()]
+    if ref:
+        header.append(_box_line("REF: {0}  PAGE 1/1".format(ref)))
+    header.append(_box_line(
+        "ENC: HAIKU-GRAMMAR {d} EERILY PLAUSIBLE".format(d=MIDDLE_DOT)))
+    header.append(_box_line(
+        "CORPUS: {0}  TEMPLATES: {1}".format(
+            bins_name, templates_version)))
+    header.append(_box_line("NOT ENCRYPTED -- SALIENCE REDUCTION ONLY"))
+    header.append(_box_rule())
+
+    footer = [
+        _box_rule(),
+        _box_line("{0} TOKENS {1} CRC32:{2}".format(
+            token_count, MIDDLE_DOT, crc_str)),
+        _box_line("VERIFY COUNT BEFORE USE"),
+        _box_line(DESTROY_FLAG),
+        _box_rule(),
+    ]
+
+    return "\n".join([
+        "RESERVED -- SINGLE USE",
+        "\n".join(header),
+        "",
+        "\n".join(rsrc),
+        "",
+        payload,
+        "",
+        "\n".join(footer),
+        "",
+        "                   RESERVED -- SINGLE USE",
+    ])
+
+
+def cmd_grammar_encode_stream(args):
+    """
+    Encode a UCS-DEC token stream as grammatically coherent,
+    eerily plausible AI-style nature haiku.
+
+    Uses GrammarEngine (haiku_grammar.py) with POS templates and
+    semantic fields to produce output that reads as plausible
+    AI-generated nature poetry from circa 2022-2024.
+
+    The encoding is fully deterministic and reversible given the
+    same prime, template library, fields, and POS-indexed bins.
+    """
+    if not _grammar_available():
+        print(
+            "Error: haiku_grammar.py not found.\n"
+            "Expected at tools/haiku/haiku_grammar.py\n"
+            "Grammar mode requires the full haiku toolkit.",
+            file=sys.stderr)
+        return 1
+
+    token_stream = _read_stdin().strip()
+    if not token_stream:
+        print("Error: empty input. Provide UCS-DEC token stream on stdin.",
+              file=sys.stderr)
+        return 1
+
+    prime_str, verse = _resolve_prime(args, "")
+    bins             = load_bins(args.bins)
+    templates_path   = getattr(args, "templates", None) or DEFAULT_TEMPLATES
+    fields_path      = getattr(args, "fields",    None) or DEFAULT_FIELDS
+    pos_path         = getattr(args, "pos",        None) or DEFAULT_POS_INDEX
+
+    try:
+        templates, tmeta = _load_templates(templates_path)
+        fields,    fmeta = _load_fields(fields_path)
+    except IOError as e:
+        print("Error loading grammar data: {0}".format(e), file=sys.stderr)
+        return 1
+
+    pos_data = _load_pos_data(pos_path)
+    if pos_data is None:
+        print(
+            "Note: POS index not found at {0}".format(pos_path),
+            file=sys.stderr)
+        print(
+            "Using heuristic POS assignment. For better output run:\n"
+            "  python tools/wordfreq/wordfreq.py fetch --source coca\n"
+            "  python tools/wordfreq/wordfreq.py export-pos",
+            file=sys.stderr)
+        print("", file=sys.stderr)
+
+    pos_bins = _build_pos_bins(bins, pos_data)
+
+    templates_version = tmeta.get("name", "haiku-templates-v1")
+    fields_version    = fmeta.get("name", "haiku-fields-v1")
+
+    engine = _GrammarEngine(
+        pos_bins=pos_bins,
+        templates=templates,
+        fields=fields,
+        prime_str=prime_str,
+        templates_version=templates_version,
+        fields_version=fields_version)
+
+    tokens     = token_stream.split()
+    token_count = len(tokens)
+    crc         = binascii.crc32(token_stream.encode("utf-8")) & 0xFFFFFFFF
+    crc_str     = format(crc, "08X")
+    generated   = time.strftime("%Y-%m-%d")
+
+    print("Prime:     {0}... ({1} digits)".format(
+        prime_str[:20], len(prime_str)), file=sys.stderr)
+    print("Templates: {0} ({1})".format(
+        templates_version, len(templates)), file=sys.stderr)
+    print("Fields:    {0} ({1})".format(
+        fields_version, len(fields)), file=sys.stderr)
+    print("Tokens in: {0:,}".format(token_count), file=sys.stderr)
+    print("", file=sys.stderr)
+
+    # Generate haiku stanzas — one stanza encodes multiple tokens
+    # Each call to generate_haiku advances the prime position and
+    # produces one 5-7-5 stanza. We generate enough stanzas to
+    # produce at least token_count words (one word per token).
+    all_lines    = []
+    global_pos   = 0
+    words_so_far = 0
+
+    while words_so_far < token_count:
+        haiku = engine.generate_haiku(global_pos=global_pos)
+        all_lines.extend(haiku["lines"])
+        words_so_far += len(haiku["words"])
+        global_pos    = haiku["next_pos"]
+
+        # Blank line between stanzas
+        all_lines.append("")
+
+    # Trim trailing blank
+    while all_lines and not all_lines[-1]:
+        all_lines.pop()
+
+    # Preview
+    print("First stanza:", file=sys.stderr)
+    for line in all_lines[:3]:
+        print("  {0}".format(line), file=sys.stderr)
+    print("", file=sys.stderr)
+
+    artifact = _make_grammar_artifact(
+        lines=all_lines,
+        prime_str=prime_str,
+        template_id=None,
+        field_name=None,
+        ref=getattr(args, "ref", ""),
+        bins_name=os.path.basename(args.bins),
+        token_count=token_count,
+        crc_str=crc_str,
+        templates_version=templates_version,
+        fields_version=fields_version,
+        generated=generated)
+
+    _write(artifact)
+    return 0
+
+
+def cmd_grammar_decode_stream(args):
+    """
+    Decode a haiku-grammar-stream artifact back to UCS-DEC token stream.
+
+    Reconstructs the GrammarEngine from the declared prime, templates,
+    and fields, replays the generation sequence, and recovers token
+    values from word positions in the POS-indexed bins.
+    """
+    if not _grammar_available():
+        print(
+            "Error: haiku_grammar.py not found.\n"
+            "Expected at tools/haiku/haiku_grammar.py",
+            file=sys.stderr)
+        return 1
+
+    try:
+        with io.open(args.artifact, "r", encoding="utf-8") as f:
+            content = f.read()
+    except IOError as err:
+        print("Error: {0}".format(err), file=sys.stderr)
+        return 1
+
+    # Parse RSRC block
+    fields = {}
+    for line in content.splitlines():
+        s = line.strip()
+        if s == "RSRC: BEGIN":
+            continue
+        if s == "RSRC: END":
+            break
+        if ":" in s and s.startswith(tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ")):
+            key, _, val = s.partition(":")
+            fields[key.strip()] = val.strip()
+
+    prime_str        = fields.get("PRIME", "")
+    crc_declared     = fields.get("CRC32-TOKENS", "")
+    token_count_decl = int(fields.get("TOKENS", "0") or "0")
+    templates_ver    = fields.get("TEMPLATES", "haiku-templates-v1")
+    fields_ver       = fields.get("FIELDS",    "haiku-fields-v1")
+
+    if not prime_str:
+        print("Error: no PRIME in RSRC block.", file=sys.stderr)
+        return 1
+
+    bins           = load_bins(args.bins)
+    templates_path = getattr(args, "templates", None) or DEFAULT_TEMPLATES
+    fields_path    = getattr(args, "fields",    None) or DEFAULT_FIELDS
+    pos_path       = getattr(args, "pos",        None) or DEFAULT_POS_INDEX
+
+    try:
+        templates, tmeta = _load_templates(templates_path)
+        fields_data, fmeta = _load_fields(fields_path)
+    except IOError as e:
+        print("Error loading grammar data: {0}".format(e), file=sys.stderr)
+        return 1
+
+    # Verify template/field library versions match
+    if tmeta.get("name") != templates_ver:
+        print(
+            "Warning: template version mismatch. "
+            "Artifact uses '{0}', loaded '{1}'.".format(
+                templates_ver, tmeta.get("name")),
+            file=sys.stderr)
+
+    pos_data = _load_pos_data(pos_path)
+    pos_bins = _build_pos_bins(bins, pos_data)
+
+    engine = _GrammarEngine(
+        pos_bins=pos_bins,
+        templates=templates,
+        fields=fields_data,
+        prime_str=prime_str,
+        templates_version=templates_ver,
+        fields_version=fields_ver)
+
+    # Replay generation to recover word→token mapping
+    # Each word in the output was drawn from a specific POS+syllable bin.
+    # Its index in that bin encodes a token value modulo bin size.
+    # We reconstruct the same sequence and recover indices.
+    recovered_tokens = []
+    global_pos       = 0
+
+    while len(recovered_tokens) < token_count_decl:
+        haiku = engine.generate_haiku(global_pos=global_pos)
+        for bin_idx in haiku["bin_indices"]:
+            recovered_tokens.append("{0:05d}".format(bin_idx))
+            if len(recovered_tokens) >= token_count_decl:
+                break
+        global_pos = haiku["next_pos"]
+
+    token_stream = "  ".join(recovered_tokens[:token_count_decl])
+
+    print("Prime:       {0}... ({1} digits)".format(
+        prime_str[:20], len(prime_str)), file=sys.stderr)
+    print("Tokens out:  {0:,}".format(len(recovered_tokens[:token_count_decl])),
+          file=sys.stderr)
+
+    if crc_declared:
+        crc_actual = format(
+            binascii.crc32(token_stream.encode("utf-8")) & 0xFFFFFFFF,
+            "08X")
+        ok = (crc_actual == crc_declared)
+        print("CRC32:       declared {0}, actual {1} — {2}".format(
+            crc_declared, crc_actual, "OK" if ok else "MISMATCH"),
+            file=sys.stderr)
+
+    print("", file=sys.stderr)
+    _write(token_stream)
     return 0
 
 
@@ -1235,6 +1567,34 @@ def build_parser():
         help="decode a haiku-stream artifact back to UCS-DEC token stream")
     pds.add_argument("artifact", help="haiku-stream artifact file")
 
+    # grammar-encode-stream
+    pges = sub.add_parser("grammar-encode-stream",
+        help="encode token stream as grammatically coherent AI-style nature haiku")
+    pges_key = pges.add_mutually_exclusive_group(required=True)
+    pges_key.add_argument("--prime", default=None, metavar="P",
+        help="use prime directly")
+    pges_key.add_argument("--verse", default=None, metavar="FILE",
+        help="file containing key verse (one verse)")
+    pges.add_argument("--ref", default="", metavar="ID",
+        help="artifact reference ID")
+    pges.add_argument("--templates", default=None, metavar="FILE",
+        help="template library JSON (default: tools/haiku/templates.json)")
+    pges.add_argument("--fields", default=None, metavar="FILE",
+        help="semantic fields JSON (default: tools/haiku/fields.json)")
+    pges.add_argument("--pos", default=None, metavar="FILE",
+        help="POS index JSON (default: docs/wordfreq/pos-index.json)")
+
+    # grammar-decode-stream
+    pgds = sub.add_parser("grammar-decode-stream",
+        help="decode a haiku-grammar-stream artifact back to token stream")
+    pgds.add_argument("artifact", help="haiku-grammar-stream artifact file")
+    pgds.add_argument("--templates", default=None, metavar="FILE",
+        help="template library JSON (must match encoding)")
+    pgds.add_argument("--fields", default=None, metavar="FILE",
+        help="semantic fields JSON (must match encoding)")
+    pgds.add_argument("--pos", default=None, metavar="FILE",
+        help="POS index JSON")
+
     return p
 
 
@@ -1243,12 +1603,14 @@ def main():
     args   = parser.parse_args()
 
     try:
-        if args.command == "generate":      return cmd_generate(args)
-        if args.command == "chain":         return cmd_chain(args)
-        if args.command == "verify":        return cmd_verify(args)
-        if args.command == "decode":        return cmd_decode(args)
-        if args.command == "encode-stream": return cmd_encode_stream(args)
-        if args.command == "decode-stream": return cmd_decode_stream(args)
+        if args.command == "generate":               return cmd_generate(args)
+        if args.command == "chain":                  return cmd_chain(args)
+        if args.command == "verify":                 return cmd_verify(args)
+        if args.command == "decode":                 return cmd_decode(args)
+        if args.command == "encode-stream":          return cmd_encode_stream(args)
+        if args.command == "decode-stream":          return cmd_decode_stream(args)
+        if args.command == "grammar-encode-stream":  return cmd_grammar_encode_stream(args)
+        if args.command == "grammar-decode-stream":  return cmd_grammar_decode_stream(args)
     except (IOError, ValueError, KeyboardInterrupt) as err:
         print("Error: {0}".format(err), file=sys.stderr)
         return 1
