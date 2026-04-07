@@ -1,0 +1,319 @@
+{
+  "_meta": {
+    "version": "1",
+    "name": "haiku-fields-v1",
+    "description": "Semantic field vocabulary for grammatically coherent, eerily plausible AI-style nature haiku. Fields drawn from classical Japanese kigo (seasonal reference words) and their 2022-2024 AI haiku equivalents. Words within each field are seed terms — the word selection engine extends outward to semantically adjacent vocabulary in the POS-indexed bins.",
+    "field_count": 28,
+    "note": "Field selection is driven by reversed digits of the prime key — the same structural pattern as the Gloss layer. One prime, two schedules, zero additional key material.",
+    "generated": "2026-04-07",
+    "tool": "tools/haiku/haiku_grammar.py (Proper Tools SRL)"
+  },
+
+  "autumn": {
+    "season": "autumn",
+    "mood": "melancholy, release, beauty in decay",
+    "ai_frequency": "very high",
+    "nouns": ["leaf", "leaves", "branch", "harvest", "amber", "rust", "acorn", "mist", "dusk", "fog", "ember", "canopy", "twilight", "shadow", "descent"],
+    "adjectives": ["golden", "bare", "fading", "hollow", "brittle", "amber", "burnt", "pale", "quiet", "still", "cold", "grey", "rust", "copper", "forgotten"],
+    "verbs": ["falling", "drifting", "fading", "turning", "releasing", "settling", "trembling", "letting", "gathering", "thinning", "dimming", "scattered"],
+    "adverbs": ["slowly", "softly", "gently", "quietly", "finally", "almost", "barely", "deeply"],
+    "prepositions": ["through", "beneath", "among", "between", "beyond", "into", "across", "upon"]
+  },
+
+  "winter": {
+    "season": "winter",
+    "mood": "stillness, endurance, stark beauty",
+    "ai_frequency": "high",
+    "nouns": ["snow", "ice", "frost", "silence", "breath", "bone", "moon", "stone", "river", "darkness", "cold", "light", "smoke", "ash", "ridge"],
+    "adjectives": ["bare", "frozen", "pale", "stark", "grey", "white", "cold", "still", "hollow", "brittle", "silent", "deep", "hard", "clear", "sharp"],
+    "verbs": ["falling", "freezing", "waiting", "enduring", "crystallising", "hardening", "stilling", "blanketing", "covering", "remaining", "persisting"],
+    "adverbs": ["still", "barely", "slowly", "quietly", "alone", "deeply", "perfectly", "utterly"],
+    "prepositions": ["beneath", "through", "under", "across", "beyond", "into", "within", "against"]
+  },
+
+  "spring": {
+    "season": "spring",
+    "mood": "renewal, tenderness, fragile hope",
+    "ai_frequency": "high",
+    "nouns": ["blossom", "petal", "bud", "rain", "bird", "light", "green", "morning", "mud", "shoot", "warmth", "sparrow", "robin", "bloom", "unfurling"],
+    "adjectives": ["tender", "new", "soft", "pale", "small", "green", "bright", "fragile", "young", "gentle", "fresh", "warm", "hopeful", "shy", "fleeting"],
+    "verbs": ["blooming", "opening", "waking", "unfolding", "returning", "emerging", "rising", "softening", "warming", "beginning", "stirring", "singing"],
+    "adverbs": ["softly", "gently", "slowly", "finally", "again", "newly", "lightly", "quietly"],
+    "prepositions": ["through", "into", "from", "beneath", "among", "toward", "along", "across"]
+  },
+
+  "summer": {
+    "season": "summer",
+    "mood": "heat, abundance, impermanence at peak",
+    "ai_frequency": "medium",
+    "nouns": ["heat", "sun", "grass", "cicada", "dragonfly", "sweat", "thunder", "afternoon", "shore", "tide", "cloud", "field", "horizon", "haze", "noon"],
+    "adjectives": ["hot", "still", "heavy", "bright", "long", "humid", "vast", "golden", "burning", "dry", "green", "lazy", "full", "endless", "open"],
+    "verbs": ["burning", "shimmering", "humming", "drifting", "blazing", "lingering", "pulsing", "swelling", "ripening", "hovering", "glaring", "singing"],
+    "adverbs": ["still", "endlessly", "heavily", "quietly", "lazily", "deeply", "brightly", "fully"],
+    "prepositions": ["beneath", "across", "through", "above", "along", "into", "under", "beyond"]
+  },
+
+  "water": {
+    "season": null,
+    "mood": "flow, reflection, depth, impermanence",
+    "ai_frequency": "very high",
+    "nouns": ["rain", "river", "pond", "stone", "ripple", "reflection", "shore", "wave", "drop", "stream", "lake", "ocean", "current", "depth", "surface"],
+    "adjectives": ["still", "deep", "clear", "dark", "cold", "moving", "quiet", "smooth", "turbid", "shallow", "endless", "silver", "soft", "distant", "broken"],
+    "verbs": ["flowing", "rippling", "reflecting", "falling", "rising", "spreading", "sinking", "dissolving", "running", "pooling", "washing", "carrying"],
+    "adverbs": ["slowly", "quietly", "deeply", "endlessly", "softly", "gently", "finally", "always"],
+    "prepositions": ["beneath", "across", "through", "into", "along", "over", "under", "within"]
+  },
+
+  "sky": {
+    "season": null,
+    "mood": "vastness, longing, the infinite ordinary",
+    "ai_frequency": "very high",
+    "nouns": ["cloud", "moon", "star", "light", "dark", "horizon", "dusk", "dawn", "sun", "blue", "grey", "wind", "bird", "silence", "emptiness"],
+    "adjectives": ["vast", "pale", "dark", "clear", "empty", "distant", "cold", "high", "deep", "low", "heavy", "bright", "quiet", "still", "endless"],
+    "verbs": ["rising", "falling", "drifting", "turning", "fading", "darkening", "brightening", "clearing", "gathering", "opening", "closing", "spreading"],
+    "adverbs": ["slowly", "quietly", "endlessly", "softly", "always", "forever", "barely", "still"],
+    "prepositions": ["above", "beyond", "beneath", "through", "across", "into", "toward", "over"]
+  },
+
+  "moon": {
+    "season": "autumn",
+    "mood": "solitude, beauty, the lone witness",
+    "ai_frequency": "very high",
+    "nouns": ["moon", "light", "shadow", "night", "silence", "reflection", "darkness", "silver", "cloud", "path", "window", "face", "water", "stone", "cold"],
+    "adjectives": ["pale", "full", "cold", "distant", "bright", "lonely", "silent", "silver", "waning", "rising", "high", "still", "clear", "quiet", "round"],
+    "verbs": ["rising", "falling", "watching", "shining", "reflecting", "climbing", "setting", "illuminating", "casting", "hanging", "floating", "remaining"],
+    "adverbs": ["silently", "alone", "quietly", "still", "always", "softly", "coldly", "high"],
+    "prepositions": ["above", "behind", "through", "beneath", "over", "across", "into", "beyond"]
+  },
+
+  "rain": {
+    "season": null,
+    "mood": "cleansing, melancholy, percussion of time",
+    "ai_frequency": "high",
+    "nouns": ["rain", "puddle", "street", "roof", "window", "drop", "mud", "river", "smell", "sound", "grey", "cloud", "gutter", "leaf", "stone"],
+    "adjectives": ["grey", "cold", "soft", "heavy", "dark", "quiet", "steady", "thin", "warm", "sudden", "endless", "light", "silver", "damp", "clean"],
+    "verbs": ["falling", "drumming", "washing", "filling", "soaking", "running", "dripping", "pooling", "tapping", "clearing", "arriving", "continuing"],
+    "adverbs": ["softly", "steadily", "quietly", "gently", "endlessly", "slowly", "suddenly", "lightly"],
+    "prepositions": ["on", "against", "through", "into", "across", "beneath", "along", "over"]
+  },
+
+  "wind": {
+    "season": null,
+    "mood": "passage, change, the unseen force",
+    "ai_frequency": "medium",
+    "nouns": ["wind", "leaf", "branch", "grass", "door", "chime", "dust", "seed", "sound", "silence", "breath", "cold", "edge", "field", "hair"],
+    "adjectives": ["cold", "sharp", "soft", "sudden", "distant", "hollow", "bitter", "gentle", "strong", "thin", "quiet", "restless", "still", "dark", "dry"],
+    "verbs": ["blowing", "moving", "bending", "carrying", "scattering", "lifting", "shifting", "turning", "passing", "whispering", "pulling", "rushing"],
+    "adverbs": ["suddenly", "softly", "coldly", "gently", "quietly", "sharply", "briefly", "always"],
+    "prepositions": ["through", "across", "over", "against", "along", "between", "beneath", "into"]
+  },
+
+  "silence": {
+    "season": null,
+    "mood": "absence, presence, the space between",
+    "ai_frequency": "very high",
+    "nouns": ["silence", "stillness", "space", "breath", "pause", "moment", "absence", "echo", "room", "void", "hush", "hollow", "gap", "nothing", "dark"],
+    "adjectives": ["still", "quiet", "empty", "hollow", "deep", "vast", "soft", "complete", "heavy", "pure", "perfect", "cold", "warm", "sudden", "broken"],
+    "verbs": ["waiting", "listening", "settling", "remaining", "filling", "deepening", "holding", "breaking", "gathering", "spreading", "lasting", "resting"],
+    "adverbs": ["still", "quietly", "deeply", "perfectly", "simply", "only", "always", "barely"],
+    "prepositions": ["within", "beneath", "between", "beyond", "through", "into", "above", "around"]
+  },
+
+  "loss": {
+    "season": null,
+    "mood": "grief, acceptance, what remains",
+    "ai_frequency": "high",
+    "nouns": ["loss", "absence", "memory", "echo", "trace", "shadow", "ghost", "dust", "silence", "remains", "nothing", "name", "place", "time", "space"],
+    "adjectives": ["gone", "forgotten", "distant", "fading", "lost", "broken", "empty", "last", "remaining", "hollow", "old", "quiet", "cold", "dark", "still"],
+    "verbs": ["fading", "forgetting", "leaving", "remaining", "echoing", "disappearing", "dissolving", "drifting", "letting", "holding", "remembering", "passing"],
+    "adverbs": ["still", "finally", "slowly", "quietly", "forever", "once", "almost", "barely"],
+    "prepositions": ["without", "beyond", "after", "beneath", "through", "from", "into", "within"]
+  },
+
+  "morning": {
+    "season": null,
+    "mood": "beginning, clarity, the daily miracle",
+    "ai_frequency": "high",
+    "nouns": ["morning", "light", "mist", "dew", "bird", "sun", "shadow", "door", "window", "garden", "path", "silence", "breath", "coffee", "hour"],
+    "adjectives": ["early", "quiet", "pale", "soft", "clear", "cold", "bright", "still", "grey", "new", "thin", "fragile", "golden", "slow", "fresh"],
+    "verbs": ["rising", "opening", "beginning", "breaking", "lifting", "clearing", "waking", "shining", "spreading", "arriving", "returning", "emerging"],
+    "adverbs": ["slowly", "quietly", "softly", "gently", "already", "again", "barely", "always"],
+    "prepositions": ["through", "into", "across", "beneath", "over", "above", "toward", "along"]
+  },
+
+  "stone": {
+    "season": null,
+    "mood": "permanence, patience, the nonhuman timescale",
+    "ai_frequency": "medium",
+    "nouns": ["stone", "rock", "mountain", "cliff", "wall", "path", "river", "moss", "weight", "silence", "age", "surface", "crack", "cold", "depth"],
+    "adjectives": ["old", "cold", "still", "heavy", "grey", "dark", "worn", "hard", "ancient", "quiet", "rough", "smooth", "weathered", "bare", "solid"],
+    "verbs": ["remaining", "waiting", "enduring", "resting", "sitting", "holding", "outlasting", "bearing", "settling", "standing", "wearing", "persisting"],
+    "adverbs": ["still", "always", "quietly", "alone", "deeply", "perfectly", "simply", "forever"],
+    "prepositions": ["beneath", "among", "beside", "under", "against", "along", "within", "above"]
+  },
+
+  "bird": {
+    "season": null,
+    "mood": "freedom, transience, the observed moment",
+    "ai_frequency": "high",
+    "nouns": ["bird", "wing", "feather", "flight", "song", "branch", "sky", "dawn", "nest", "silence", "shadow", "call", "sparrow", "crow", "heron"],
+    "adjectives": ["single", "small", "dark", "still", "distant", "lone", "silent", "quick", "grey", "black", "white", "wild", "free", "brief", "sudden"],
+    "verbs": ["singing", "flying", "landing", "perching", "calling", "lifting", "falling", "turning", "rising", "crossing", "watching", "disappearing"],
+    "adverbs": ["suddenly", "silently", "quickly", "still", "briefly", "alone", "high", "away"],
+    "prepositions": ["above", "across", "through", "beyond", "into", "over", "toward", "between"]
+  },
+
+  "tree": {
+    "season": null,
+    "mood": "rootedness, cycles, the long witness",
+    "ai_frequency": "medium",
+    "nouns": ["tree", "branch", "root", "bark", "leaf", "canopy", "shadow", "ring", "trunk", "forest", "grove", "wood", "sap", "blossom", "seed"],
+    "adjectives": ["bare", "old", "tall", "dark", "still", "hollow", "dead", "living", "ancient", "lone", "bent", "deep", "wide", "quiet", "heavy"],
+    "verbs": ["standing", "bending", "falling", "growing", "reaching", "holding", "casting", "sheltering", "swaying", "rooting", "budding", "bearing"],
+    "adverbs": ["still", "slowly", "quietly", "deeply", "always", "alone", "high", "barely"],
+    "prepositions": ["beneath", "among", "through", "between", "beside", "within", "against", "above"]
+  },
+
+  "path": {
+    "season": null,
+    "mood": "journey, choice, the road not summarised",
+    "ai_frequency": "medium",
+    "nouns": ["path", "road", "trail", "step", "stone", "direction", "distance", "end", "beginning", "fork", "bridge", "gate", "edge", "horizon", "dust"],
+    "adjectives": ["long", "narrow", "winding", "empty", "dark", "quiet", "worn", "old", "steep", "distant", "clear", "lost", "broken", "straight", "soft"],
+    "verbs": ["walking", "following", "leading", "ending", "beginning", "winding", "continuing", "disappearing", "crossing", "turning", "returning", "fading"],
+    "adverbs": ["slowly", "alone", "quietly", "still", "forward", "back", "always", "further"],
+    "prepositions": ["along", "through", "toward", "beyond", "into", "from", "across", "between"]
+  },
+
+  "light": {
+    "season": null,
+    "mood": "revelation, transience, the gift of seeing",
+    "ai_frequency": "very high",
+    "nouns": ["light", "shadow", "darkness", "sun", "beam", "ray", "glow", "brightness", "dusk", "dawn", "lantern", "candle", "flame", "shine", "gleam"],
+    "adjectives": ["soft", "pale", "warm", "cold", "fading", "golden", "dim", "bright", "clear", "thin", "last", "early", "late", "slant", "brief"],
+    "verbs": ["shining", "fading", "falling", "touching", "illuminating", "warming", "casting", "filtering", "spreading", "breaking", "entering", "failing"],
+    "adverbs": ["softly", "briefly", "slowly", "gently", "suddenly", "still", "barely", "always"],
+    "prepositions": ["through", "across", "into", "beneath", "over", "upon", "between", "beyond"]
+  },
+
+  "dark": {
+    "season": null,
+    "mood": "mystery, rest, what the eye cannot hold",
+    "ai_frequency": "high",
+    "nouns": ["dark", "darkness", "night", "shadow", "silence", "depth", "void", "black", "edge", "corner", "room", "sleep", "dream", "absence", "nothing"],
+    "adjectives": ["dark", "deep", "still", "cold", "quiet", "vast", "heavy", "soft", "complete", "total", "gentle", "thick", "velvet", "warm", "perfect"],
+    "verbs": ["falling", "gathering", "deepening", "settling", "covering", "spreading", "holding", "waiting", "remaining", "coming", "arriving", "resting"],
+    "adverbs": ["quietly", "deeply", "softly", "slowly", "completely", "utterly", "still", "always"],
+    "prepositions": ["into", "within", "beneath", "through", "beyond", "above", "around", "under"]
+  },
+
+  "home": {
+    "season": null,
+    "mood": "belonging, absence, the ache of the familiar",
+    "ai_frequency": "medium",
+    "nouns": ["home", "door", "window", "room", "floor", "wall", "light", "table", "chair", "kitchen", "garden", "roof", "fire", "smell", "memory"],
+    "adjectives": ["quiet", "empty", "warm", "cold", "still", "familiar", "small", "old", "dark", "lit", "distant", "lost", "new", "broken", "unchanged"],
+    "verbs": ["returning", "leaving", "opening", "closing", "waiting", "remaining", "filling", "emptying", "remembering", "finding", "losing", "keeping"],
+    "adverbs": ["still", "again", "quietly", "alone", "finally", "always", "never", "slowly"],
+    "prepositions": ["through", "into", "within", "toward", "from", "beside", "beneath", "above"]
+  },
+
+  "time": {
+    "season": null,
+    "mood": "impermanence, the Buddhist undercurrent of all AI haiku",
+    "ai_frequency": "very high",
+    "nouns": ["time", "moment", "season", "year", "hour", "day", "night", "dawn", "dusk", "instant", "age", "century", "breath", "heartbeat", "now"],
+    "adjectives": ["passing", "fleeting", "still", "slow", "brief", "long", "endless", "short", "quiet", "distant", "late", "early", "lost", "remaining", "last"],
+    "verbs": ["passing", "flowing", "stopping", "returning", "moving", "remaining", "fading", "continuing", "slipping", "holding", "releasing", "marking"],
+    "adverbs": ["slowly", "still", "always", "once", "finally", "quietly", "forever", "briefly"],
+    "prepositions": ["through", "beyond", "within", "across", "into", "after", "before", "between"]
+  },
+
+  "body": {
+    "season": null,
+    "mood": "embodiment, fragility, the mortal fact",
+    "ai_frequency": "medium",
+    "nouns": ["breath", "hand", "eye", "heart", "bone", "skin", "blood", "muscle", "weight", "warmth", "cold", "pulse", "touch", "voice", "face"],
+    "adjectives": ["warm", "cold", "still", "tired", "quiet", "small", "fragile", "old", "young", "bare", "soft", "hard", "alive", "heavy", "light"],
+    "verbs": ["breathing", "holding", "touching", "feeling", "moving", "resting", "aching", "warming", "cooling", "carrying", "remembering", "releasing"],
+    "adverbs": ["slowly", "quietly", "gently", "still", "barely", "softly", "deeply", "lightly"],
+    "prepositions": ["through", "within", "beneath", "into", "across", "against", "above", "beyond"]
+  },
+
+  "mountain": {
+    "season": null,
+    "mood": "scale, humility, the view from above",
+    "ai_frequency": "medium",
+    "nouns": ["mountain", "peak", "ridge", "slope", "valley", "stone", "snow", "cloud", "wind", "path", "summit", "height", "depth", "silence", "distance"],
+    "adjectives": ["high", "cold", "still", "vast", "dark", "pale", "bare", "distant", "steep", "deep", "quiet", "ancient", "lone", "grey", "white"],
+    "verbs": ["rising", "standing", "watching", "waiting", "enduring", "remaining", "towering", "covering", "clearing", "surrounding", "dissolving", "lifting"],
+    "adverbs": ["still", "quietly", "alone", "high", "deeply", "always", "slowly", "barely"],
+    "prepositions": ["above", "below", "across", "through", "beyond", "beneath", "toward", "over"]
+  },
+
+  "garden": {
+    "season": null,
+    "mood": "cultivation, decay, the tended wildness",
+    "ai_frequency": "medium",
+    "nouns": ["garden", "flower", "weed", "soil", "seed", "root", "stem", "petal", "bee", "butterfly", "wall", "gate", "path", "tool", "rain"],
+    "adjectives": ["quiet", "still", "green", "wild", "tended", "overgrown", "small", "old", "new", "wet", "dry", "warm", "fragrant", "hidden", "open"],
+    "verbs": ["growing", "blooming", "wilting", "tending", "weeding", "planting", "dying", "returning", "spreading", "closing", "opening", "waiting"],
+    "adverbs": ["quietly", "slowly", "still", "gently", "finally", "again", "already", "barely"],
+    "prepositions": ["among", "between", "beneath", "through", "along", "beside", "within", "above"]
+  },
+
+  "digital": {
+    "season": null,
+    "mood": "the AI haiku that knows it is AI, slightly uncanny",
+    "ai_frequency": "medium",
+    "nouns": ["screen", "light", "cursor", "signal", "data", "pixel", "network", "code", "noise", "pattern", "stream", "bit", "pulse", "echo", "static"],
+    "adjectives": ["bright", "cold", "still", "quiet", "distant", "lost", "endless", "silent", "broken", "clear", "dark", "scattered", "faint", "brief", "pale"],
+    "verbs": ["flickering", "transmitting", "fading", "processing", "searching", "connecting", "breaking", "streaming", "waiting", "receiving", "sending", "failing"],
+    "adverbs": ["still", "endlessly", "quietly", "briefly", "always", "finally", "already", "barely"],
+    "prepositions": ["through", "across", "into", "beyond", "between", "within", "above", "toward"]
+  },
+
+  "snow": {
+    "season": "winter",
+    "mood": "purity, silence, the world made new and erased",
+    "ai_frequency": "high",
+    "nouns": ["snow", "flake", "drift", "field", "silence", "cold", "white", "branch", "roof", "path", "world", "light", "depth", "print", "crystal"],
+    "adjectives": ["white", "soft", "still", "deep", "cold", "quiet", "pure", "fresh", "light", "heavy", "new", "pale", "clean", "undisturbed", "silent"],
+    "verbs": ["falling", "covering", "settling", "drifting", "blanketing", "filling", "muffling", "erasing", "softening", "accumulating", "melting", "hiding"],
+    "adverbs": ["softly", "quietly", "slowly", "still", "gently", "deeply", "completely", "silently"],
+    "prepositions": ["beneath", "through", "under", "across", "upon", "into", "above", "over"]
+  },
+
+  "fog": {
+    "season": null,
+    "mood": "ambiguity, the hidden, soft dissolution",
+    "ai_frequency": "medium",
+    "nouns": ["fog", "mist", "grey", "shape", "outline", "distance", "water", "air", "silence", "form", "shadow", "light", "morning", "river", "hill"],
+    "adjectives": ["grey", "soft", "thick", "thin", "cold", "quiet", "still", "pale", "heavy", "low", "dense", "slow", "damp", "wet", "shifting"],
+    "verbs": ["settling", "lifting", "drifting", "hiding", "revealing", "dissolving", "gathering", "thinning", "covering", "moving", "rolling", "hanging"],
+    "adverbs": ["slowly", "softly", "quietly", "still", "barely", "gently", "gradually", "almost"],
+    "prepositions": ["through", "into", "across", "beneath", "over", "among", "within", "above"]
+  },
+
+  "fire": {
+    "season": null,
+    "mood": "warmth, destruction, the hypnotic present",
+    "ai_frequency": "medium",
+    "nouns": ["fire", "flame", "ember", "ash", "smoke", "warmth", "light", "heat", "spark", "coal", "wood", "hearth", "dark", "shadow", "night"],
+    "adjectives": ["warm", "bright", "hot", "dying", "small", "dancing", "low", "slow", "quiet", "dark", "golden", "red", "cold", "last", "living"],
+    "verbs": ["burning", "dying", "flickering", "warming", "consuming", "glowing", "crackling", "fading", "rising", "falling", "spreading", "holding"],
+    "adverbs": ["slowly", "quietly", "still", "gently", "softly", "brightly", "briefly", "always"],
+    "prepositions": ["in", "beneath", "above", "through", "within", "beside", "against", "into"]
+  },
+
+  "cherry_blossom": {
+    "season": "spring",
+    "mood": "mono no aware — the pathos of transience, the classic haiku feeling",
+    "ai_frequency": "very high",
+    "nouns": ["blossom", "petal", "branch", "tree", "pink", "white", "wind", "falling", "ground", "moment", "beauty", "spring", "cloud", "rain", "sky"],
+    "adjectives": ["pale", "soft", "brief", "pink", "white", "falling", "floating", "fleeting", "delicate", "small", "fragile", "last", "first", "quiet", "still"],
+    "verbs": ["falling", "drifting", "blooming", "scattering", "floating", "opening", "fading", "covering", "touching", "releasing", "passing", "returning"],
+    "adverbs": ["softly", "slowly", "briefly", "gently", "finally", "again", "silently", "lightly"],
+    "prepositions": ["through", "beneath", "upon", "across", "into", "above", "toward", "among"]
+  }
+}
