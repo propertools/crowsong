@@ -404,6 +404,111 @@ reconstruction, not the cost of active decryption with the seed.
 
 ---
 
+## 11. Gloss-W3: value-space expander for WIDTH/3 BINARY
+
+*Companion construction to prime-chain/1. Pre-normative design sketch.*
+
+### 11.1 Motivation
+
+WIDTH/3 BINARY + mod3 CCL achieves H_post ≈ 8.87–8.93 bits/token
+(empirical results, April 2026, 37 languages). The theoretical hard
+ceiling is log₂(1000) = 9.97 bits/token. The gap is approximately
+1 bit/token.
+
+The ceiling is bounded by the input distribution: compressed binary
+has 256 distinct byte values. After mod3 CCL, unique token count
+reaches ~643, but the distribution is non-uniform — high token values
+(256–999) are structurally underrepresented because the input tokens
+are clustered at 000–255.
+
+Gloss-W3 is a keyed value-space expander that scatters the 256 input
+token values across the full WIDTH/3 token vocabulary (000–999) before
+CCL runs. The same structural pattern as the existing Gloss layer:
+reversed prime digits → keyed permutation → value-space transformation.
+One design pattern, two domains.
+
+### 11.2 Construction
+
+```
+key        ← SHA256(reversed digits of P as UTF-8 string)
+permutation ← Fisher-Yates shuffle of [0..999] seeded from key
+Gloss-W3(V) = permutation[V]     for V in {0..255}
+```
+
+The permutation maps each of the 256 input byte values to a unique
+position in {0..999}. The 256 selected positions are pseudo-random
+across the full token vocabulary, determined by the key.
+
+Reversal:
+
+```
+inverse ← {permutation[i]: i for i in range(256)}
+Gloss-W3⁻¹(W) = inverse[W]
+```
+
+### 11.3 Recommended pipeline
+
+```
+compressed binary
+  → WIDTH/3 encode
+  → Gloss-W3          (key = rev(P), scatters 000–255 → 000–999)
+  → prime-chain       (walk schedule, §3)
+  → mod3 CCL stack    (100% twist rate)
+  → artifact
+```
+
+Reversal (in order):
+
+```
+artifact
+  → mod3 CCL unstack
+  → prime-chain untwist
+  → Gloss-W3⁻¹
+  → WIDTH/3 decode
+  → decompressed binary
+```
+
+### 11.4 RSRC block
+
+```
+RSRC: BEGIN
+  TYPE:         ccl-prime-twist
+  VERSION:      1
+  SCHEDULE:     prime-chain/1
+  SEED-PRIME:   <P₀>
+  GLOSS:        gloss-w3/1
+  TWIST-MAP:    <pos:base ...>
+  WIDTH:        3
+  TOKENS:       <count>
+  CRC32:        <hex>
+RSRC: END
+```
+
+### 11.5 Hypothesis
+
+After Gloss-W3, the 256 input byte values occupy 256 pseudo-random
+positions across {000..999}. mod3 CCL then re-expresses each of
+these in base 7, 8, or 9. The output values are functions of the
+scattered input positions — not clustered at the low end of the
+token vocabulary. The result should be a more uniform output
+distribution, higher unique token count (> 643), and H_post
+meaningfully above 8.93 bits/token.
+
+This hypothesis requires empirical validation. See PRIME-CHAIN-002
+in ISSUE-TRACKER.md.
+
+### 11.6 Key property
+
+Gloss-W3 uses the **reversed** digit sequence of P as its key seed —
+the same structural pattern as the existing Gloss layer for WIDTH/5
+non-Latin scripts. The forward digits drive the prime-chain schedule;
+the reversed digits drive the Gloss-W3 permutation. One prime, two
+independent schedules, zero additional key material.
+
+*Pre-normative. Pending empirical validation.*
+
+---
+
 *Pre-normative. Subject to revision.*
 *Proper Tools SRL — propertools.be*
 *TLP:CLEAR*
