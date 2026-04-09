@@ -1,0 +1,881 @@
+Internet-Draft                                                 T. Darley
+Intended status: Informational                          Proper Tools SRL
+Expires: 2027-04-01                                        1 April 2026
+
+
+                   Crowsong Archivist Header Format
+          A Self-Describing Plain-Text Corpus Wrapping Convention
+
+                  draft-darley-crowsong-archivist-00
+
+
+Abstract
+
+   This document specifies the Crowsong Archivist Header Format (CAHF),
+   a plain-text wrapping convention for corpus documents, tool-cached
+   data files, and archival artifacts within the Crowsong Suite
+   [CROWSONG].
+
+   A CAHF-stamped file is a single UTF-8 plain-text file consisting of
+   a self-describing comment header, an explicit sentinel line, and a
+   document body.  The header declares provenance metadata and a SHA256
+   digest of the body.  Any person, tool, or text editor can read the
+   header, extract the body, and verify the digest offline without a
+   database, manifest, or network connection.
+
+   CAHF is a canonical-text convention, not a byte-for-byte container.
+   Line endings are normalised to LF and trailing newlines are
+   canonicalised during stamping.  The SHA256 is computed over this
+   normalised body, ensuring that the same logical document produces the
+   same digest across platforms.
+
+   This document is both a specification and a conformance contract.
+   Crowsong tools that produce or consume CAHF-stamped files MUST cite
+   this document and MUST implement exactly the field names, sentinel
+   line, normalisation rule, and hashing contract defined here.  Tool-
+   local reimplementations are accepted and expected; shared imports are
+   not required.
+
+Status of This Memo
+
+   This Internet-Draft is submitted for informational purposes.  It
+   documents an internal convention of the Crowsong Suite rather than
+   a general-purpose IETF protocol.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   documents or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 1 April 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.
+
+Table of Contents
+
+   1.  Introduction
+      1.1.  Motivation
+      1.2.  Design Goals
+      1.3.  Scope and Relationship to Other Tools
+      1.4.  Terminology
+   2.  File Structure
+      2.1.  Overview
+      2.2.  Header Block
+      2.3.  Sentinel Line
+      2.4.  Body
+   3.  Field Definitions
+      3.1.  Required Fields
+      3.2.  Standard Optional Fields
+      3.3.  Unknown Fields
+   4.  Normalisation and Hashing
+      4.1.  Line Ending Normalisation
+      4.2.  Trailing Newline Canonicalisation
+      4.3.  SHA256 Computation
+      4.4.  Hashing Contract (Normative)
+   5.  Stamping Procedure
+   6.  Verification Procedure
+      6.1.  Parsing
+      6.2.  Body Extraction
+      6.3.  Digest Verification
+      6.4.  Error Handling
+   7.  Partial and Legacy Compliance
+      7.1.  Files Without a Sentinel
+      7.2.  Files Without a SHA256 Field
+      7.3.  Legacy Colon Separator
+   8.  Conformance Requirements for Tool Implementors
+      8.1.  Stamping Conformance
+      8.2.  Verification Conformance
+      8.3.  Independence Requirement
+   9.  Security Considerations
+      9.1.  Integrity vs. Authenticity
+      9.2.  First-Fetch Trust
+      9.3.  Unverified Cache Use
+   10. IANA Considerations
+   11. References
+      11.1. Normative References
+      11.2. Informative References
+   12. Acknowledgements
+   13. Author's Address
+   A.  Canonical Examples
+      A.1.  Minimal Stamped File
+      A.2.  Full Corpus File (cmudict.dict pattern)
+      A.3.  General Document (archivist.py pattern)
+   B.  Known SHA256 Constants
+   C.  Conformance Checklist
+
+1.  Introduction
+
+1.1.  Motivation
+
+   The Crowsong Suite operates under the assumption that infrastructure
+   may fail.  Corpus files are fetched once from remote sources and
+   cached for indefinite offline use.  Artifacts are transmitted over
+   degraded channels.  Tools are deployed independently, without shared
+   libraries or a central verification service.
+
+   In this environment, a cached file must carry its own verification
+   credentials.  A tool verifying a file must be able to do so without
+   contacting a remote server, importing a shared library, or reading a
+   separate manifest.  A human operator must be able to inspect the
+   file with a text editor and verify its digest with any SHA256
+   calculator.
+
+   CAHF satisfies these requirements with the simplest possible
+   mechanism: a block of comment lines at the top of the file, a
+   sentinel line marking where those comments end, and the document
+   body below.
+
+1.2.  Design Goals
+
+   Human-readable.  Any literate person with a text editor can open a
+      CAHF file, read the header, extract the body below the sentinel,
+      and verify the SHA256 using a standard tool.  No Crowsong software
+      is required to read or verify a CAHF file.
+
+   Offline-verifiable.  Verification requires only the file itself.
+      No network access, no external manifest, no central service.
+
+   Platform-stable.  CRLF normalisation and trailing-newline
+      canonicalisation ensure that the same logical document produces
+      the same SHA256 on all platforms.
+
+   Tool-independent.  Tools MUST implement CAHF locally.  Shared
+      imports between Crowsong tools are NOT REQUIRED and NOT
+      RECOMMENDED.  Operational independence takes priority over code
+      reuse.
+
+   Append-safe for metadata.  The SHA256 covers the body only.  Header
+      fields (title, date, source URL) may be amended post-stamping
+      without invalidating the digest.  The body is what matters; the
+      header is metadata.
+
+   Minimal.  CAHF introduces no binary structure, no custom parser
+      requirements, and no dependencies beyond SHA256.  A text editor
+      and a SHA256 calculator are sufficient for full manual compliance.
+
+1.3.  Scope and Relationship to Other Tools
+
+   CAHF is the shared file format for the following Crowsong tools:
+
+      tools/archivist/archivist.py  --  General-purpose CAHF stamping
+         and verification tool.  The reference implementation of the
+         full CAHF specification including all optional fields.
+
+      tools/texts/texts.py  --  Gutenberg corpus mirror.  Produces
+         CAHF-stamped text files.  Verifies cached files using CAHF
+         before use.
+
+      tools/udhr/udhr.py  --  UDHR corpus mirror.  Produces CAHF-
+         stamped text files for all extracted UDHR language versions.
+
+      tools/cmudict/cmudict.py  --  CMU Pronouncing Dictionary mirror.
+         Produces CAHF-stamped dictionary files.  cmudict.dict is an
+         external corpus mirror and uses only the fields relevant to
+         corpus provenance (SOURCE, SHA256).  This is a documented
+         exception to the full optional field set; see Section 8.3.
+
+   Any file stamped by any of these tools MUST be verifiable by any
+   other tool that implements this specification.  This cross-tool
+   verifiability is a stated property of CAHF.
+
+   Tools implementing CAHF locally MUST NOT import archivist.py to do
+   so.  Each tool maintains an independent implementation conforming to
+   this specification.  This is intentional: survivability of
+   individual tools under degraded deployment is prioritised over
+   DRY-style code sharing.
+
+1.4.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174].
+
+   Stamping:  The process of wrapping a document body in a CAHF header,
+      computing the SHA256, and writing the complete CAHF file.
+
+   Verification:  The process of extracting the declared SHA256 from a
+      CAHF header, recomputing the SHA256 over the body, and comparing
+      the two values.
+
+   Sentinel line:  The line "# ---END-HEADER---" which marks the
+      boundary between the CAHF header and the document body.
+
+   Normalised body:  The document body after CRLF-to-LF normalisation
+      and trailing-newline canonicalisation, as defined in Section 4.
+
+   Unstamped file:  A file that does not begin with "# ARCHIVIST" and
+      does not contain a sentinel line.  Such files MUST NOT be
+      reported as passing CAHF verification.
+
+   Legacy file:  A CAHF-format file that uses a colon separator in
+      header fields or that lacks a sentinel line.  See Section 7.
+
+2.  File Structure
+
+2.1.  Overview
+
+   A CAHF-stamped file has the following structure:
+
+      <header block>
+      # ---END-HEADER---
+      <body>
+
+   The header block consists of one or more comment lines, each
+   beginning with "# " (hash, space).  The sentinel line is the literal
+   string "# ---END-HEADER---" followed by a newline.  The body begins
+   immediately on the line following the sentinel.
+
+   The complete file MUST be UTF-8 encoded.  Line endings in the stored
+   file MUST be LF (U+000A).  CRLF is normalised on read; CAHF files
+   MUST NOT be written with CRLF line endings.
+
+2.2.  Header Block
+
+   The header block consists of field lines and MAY include blank
+   comment lines for readability.
+
+   Each field line has the form:
+
+      # <FIELD>  <value>
+
+   where <FIELD> is an uppercase ASCII field name, two or more spaces
+   separate the field name from the value, and <value> is arbitrary
+   UTF-8 text not containing a newline.
+
+   Canonical field line format uses exactly two spaces between the
+   field name and the value:
+
+      # SHA256    3a7f91c2b04e8d6f1a2b3c4d5e6f789012345678901234567890
+
+   The first non-empty header line MUST be the ARCHIVIST marker field:
+
+      # ARCHIVIST  v1.0
+
+   This line MUST be present for a file to be considered stamped.
+   Tools parsing CAHF files MUST gate on this line: if the first non-
+   empty line of the file does not begin with "# ARCHIVIST", the file
+   MUST be treated as unstamped without further header processing.
+
+   Blank comment lines (containing only "#") MAY appear between field
+   lines for readability and MUST be ignored during field parsing.
+
+2.3.  Sentinel Line
+
+   The sentinel line is the exact string:
+
+      # ---END-HEADER---
+
+   followed by a newline character (U+000A).
+
+   The sentinel MUST appear as a complete line -- that is, it MUST be
+   preceded by a newline (or be the first line of the file, which is
+   not valid for a stamped file) and followed by a newline.
+
+   Implementations MUST use "# ---END-HEADER---" verbatim.  Variations
+   in spacing, capitalisation, or punctuation are NOT permitted and
+   MUST NOT be recognised as valid sentinels.
+
+   The body begins immediately after the newline that terminates the
+   sentinel line.  There is no blank line between the sentinel and the
+   body.  The format:
+
+      # ---END-HEADER---\n<body>
+
+   is canonical.  Tools writing CAHF files MUST NOT insert an additional
+   blank line between the sentinel and the body.
+
+   Rationale: An explicit, unique sentinel eliminates the structural
+   ambiguity of blank-line-delimited headers when the body itself
+   contains blank lines at the start.  It also provides a single,
+   unambiguous split point for both parsers and human readers.
+
+2.4.  Body
+
+   The body is the document content.  In the stored CAHF file, the body
+   begins immediately after the sentinel line and extends to the end of
+   the file.
+
+   For the purposes of SHA256 computation, the body is extracted and
+   normalised per Section 4 before hashing.  The normalised body is
+   what is hashed; the stored body (including any trailing newline
+   appended by the stamping tool) is not hashed directly.
+
+   See Section 4.4 for the precise hashing contract.
+
+3.  Field Definitions
+
+3.1.  Required Fields
+
+   ARCHIVIST  The format marker.  Value MUST be "v1.0" for files
+      conforming to this revision of the specification.  MUST be the
+      first non-empty line of the header block.
+
+      Example:  # ARCHIVIST  v1.0
+
+   SHA256  The SHA256 digest of the normalised body, as a lowercase
+      hexadecimal string of exactly 64 characters.  MUST be present for
+      a file to be considered stamped.  A file with an ARCHIVIST marker
+      but no SHA256 field MUST be treated as unstamped or damaged.
+
+      Example:  # SHA256    3a7f91c2b04e8d6f1a2b3c4d5e6f7890...
+
+3.2.  Standard Optional Fields
+
+   The following fields are defined for use by Crowsong tools.
+   Implementations SHOULD use these field names when the corresponding
+   metadata is available.
+
+   TITLE    Human-readable title of the document.
+   AUTHOR   Author name(s).
+   LANG     Language or script identifier (e.g., "en", "ar", "zh-Hans").
+   SOURCE   Source URL or bibliographic reference.
+   DATE     ISO 8601 date of stamping (YYYY-MM-DD).
+   FETCHED  ISO 8601 date of first fetch, for corpus mirror files.
+   ENTRIES  Count of dictionary/corpus entries, for structured data files.
+   CHARS    Character count of the normalised body.
+   LINES    Line count of the normalised body.
+   TAGS     Comma-separated classification tags.
+   TLP      Traffic Light Protocol classification (CLEAR/GREEN/AMBER/RED).
+   NOTE     Freeform annotation.
+   LICENSE  License of the document body.
+   TOOL     Generating tool and version (e.g., "tools/cmudict/cmudict.py").
+
+   All optional fields are included at the discretion of the stamping
+   tool.  Their presence or absence does not affect verification.
+
+3.3.  Unknown Fields
+
+   Unknown fields encountered during parsing MUST be stored and MUST be
+   displayed by tools that implement a "show" or metadata display
+   function.  Unknown fields MUST be ignored for verification purposes.
+   Unknown fields MUST NOT cause a parser to fail or skip the SHA256
+   field.
+
+   This forward-compatibility rule ensures that files stamped by a
+   future revision of this specification remain parseable and
+   verifiable by older tools.
+
+4.  Normalisation and Hashing
+
+4.1.  Line Ending Normalisation
+
+   Before any processing (stamping or verification), the input text
+   MUST be normalised so that all line endings are LF (U+000A).
+
+   Normalisation MUST replace:
+      *  CRLF (U+000D U+000A) with LF (U+000A)
+      *  Bare CR (U+000D) with LF (U+000A)
+
+   This normalisation MUST be applied in CRLF-first order: CRLF
+   sequences MUST be replaced before bare CR sequences to avoid
+   double-replacement.  Implementations MUST process in the order:
+   replace "\r\n" with "\n", then replace remaining "\r" with "\n".
+
+4.2.  Trailing Newline Canonicalisation
+
+   After line ending normalisation, any trailing newline characters
+   MUST be stripped from the end of the body before hashing.  Multiple
+   trailing newlines collapse to zero trailing newlines for the purposes
+   of SHA256 computation.
+
+   Rationale: Different tools and editors append different numbers of
+   trailing newlines.  Stripping trailing newlines before hashing
+   ensures that the same logical content produces the same digest
+   regardless of how it was saved.
+
+4.3.  SHA256 Computation
+
+   The SHA256 is computed over the UTF-8 encoding of the normalised
+   body string (after line ending normalisation and trailing newline
+   stripping).  The result is represented as a lowercase hexadecimal
+   string of exactly 64 characters.
+
+   In pseudocode:
+
+      normalised_body = strip_trailing_newlines(normalise_line_endings(body))
+      digest = sha256(encode_utf8(normalised_body)).hexdigest()
+
+   Implementations MUST produce lowercase hex.  Uppercase hex in a
+   declared SHA256 field SHOULD be accepted during verification but
+   MUST NOT be emitted during stamping.
+
+4.4.  Hashing Contract (Normative)
+
+   This section states the complete hashing contract in unambiguous
+   terms for tool implementors.
+
+   Let body_fetched be the body content as received from an external
+   source (e.g., a downloaded corpus file), after line ending
+   normalisation per Section 4.1.
+
+   Let body_stored be the body as written to the CAHF file.
+
+   The following invariants MUST hold:
+
+   (a) Stamping:
+         body_for_hash = body_fetched.rstrip("\n")
+         sha256_declared = sha256(body_for_hash.encode("utf-8")).hexdigest()
+
+   (b) Storage:  body_stored MAY differ from body_fetched by at most
+      one appended trailing newline.  That is:
+         body_stored == body_for_hash + "\n"
+      is the canonical form written to disk.
+
+   (c) Verification:  To verify a stored CAHF file, extract the body
+      after the sentinel line, strip exactly the trailing newline added
+      by (b), and compute SHA256:
+         body_extracted = content_after_sentinel
+         body_for_hash  = body_extracted.rstrip("\n")
+         sha256_actual  = sha256(body_for_hash.encode("utf-8")).hexdigest()
+
+   (d) Consistency:  sha256_declared (computed in (a)) MUST equal
+      sha256_actual (computed in (c)) for all correctly stamped files.
+
+   This contract ensures that tools which stamp and tools which verify
+   operate on the same logical body, regardless of whether an
+   implementation strips newlines before hashing (at stamp time) or
+   after reading (at verify time).
+
+   Implementation note: "strip the trailing newline added by the cache
+   wrapper" is the correct mental model for verification.  Stripping
+   all trailing newlines (body.rstrip("\n")) is equally correct because
+   (b) guarantees at most one was added.
+
+5.  Stamping Procedure
+
+   To stamp a document body with a CAHF header, a conformant
+   implementation MUST:
+
+   1.  Normalise line endings per Section 4.1.
+
+   2.  Strip trailing newlines from the normalised body.
+
+   3.  Compute the SHA256 per Section 4.3.
+
+   4.  Build the header block.  The header block MUST begin with:
+
+         # ARCHIVIST  v1.0
+
+      followed by any desired optional fields, followed by the SHA256
+      field.  Blank comment lines MAY be inserted for readability.
+
+   5.  Write the complete CAHF file in this order:
+         a.  Header block (all lines ending with LF)
+         b.  Sentinel line: "# ---END-HEADER---\n"
+         c.  Body (the normalised, trailing-newline-stripped body)
+         d.  One trailing LF (U+000A)
+
+   The complete file MUST end with exactly one LF.
+
+   The field order within the header block is not normatively specified,
+   except that ARCHIVIST MUST be first and SHA256 SHOULD be last.  The
+   ordering ARCHIVIST, [metadata fields], CHARS, LINES, SHA256 is
+   RECOMMENDED for readability.
+
+6.  Verification Procedure
+
+6.1.  Parsing
+
+   To verify a CAHF file, a conformant implementation MUST:
+
+   1.  Read the complete file as UTF-8 text.
+
+   2.  Normalise line endings per Section 4.1.
+
+   3.  Check the first non-empty line.  If it does not begin with
+      "# ARCHIVIST", the file is unstamped.  Stop and report
+      "unstamped" -- do NOT report PASS.
+
+   4.  Locate the sentinel line "# ---END-HEADER---\n".  If absent,
+      treat the file as legacy per Section 7.1.
+
+   5.  Split the file at the sentinel into header text and body text.
+
+   6.  Parse header fields per the rules in Section 2.2.
+
+   7.  Locate the SHA256 field.  If absent, the file MUST be treated
+      as damaged or legacy, not as passing.  Stop and report FAIL or
+      UNSTAMPED as appropriate.
+
+6.2.  Body Extraction
+
+   The body text is the content of the file after the sentinel line.
+   Apply Section 4.4(c): strip the trailing newline added by the
+   stamping tool.
+
+      body_for_hash = body_text.rstrip("\n")
+
+   This produces the same string that was hashed during stamping.
+
+6.3.  Digest Verification
+
+   Compute:
+
+      sha256_actual = sha256(body_for_hash.encode("utf-8")).hexdigest()
+
+   Compare sha256_actual to the value declared in the SHA256 header
+   field (case-insensitively).
+
+   If they match: report PASS.
+   If they do not match: report FAIL.  Both the declared and actual
+   digests MUST be reported to the operator.
+
+6.4.  Error Handling
+
+   The following conditions MUST result in a FAIL or UNSTAMPED result,
+   never a PASS:
+
+      *  First non-empty line does not begin with "# ARCHIVIST"
+      *  Sentinel line is absent (treat as legacy; see Section 7.1)
+      *  SHA256 field is absent
+      *  SHA256 field value is not a valid 64-character hex string
+      *  SHA256 comparison fails
+      *  File cannot be read or decoded as UTF-8
+
+   Tools MUST NOT silently pass a file that cannot be verified.
+   "Cannot verify" is not the same as "PASS".
+
+7.  Partial and Legacy Compliance
+
+7.1.  Files Without a Sentinel
+
+   Files that begin with "# ARCHIVIST" but do not contain the sentinel
+   line "# ---END-HEADER---" are considered legacy CAHF files.  These
+   files predate this specification.
+
+   Implementations MAY attempt to extract the body from legacy files
+   using a blank-line delimiter (splitting at the first "\n\n" after
+   the header block).  If they do, they MUST clearly report the file
+   as "legacy format" rather than "PASS".
+
+   Implementations MUST NOT silently verify legacy files as PASS.
+   Operators MUST be informed that the file does not conform to the
+   current sentinel-based format and SHOULD be prompted to re-stamp.
+
+7.2.  Files Without a SHA256 Field
+
+   A file that begins with "# ARCHIVIST" but contains no SHA256 field
+   (whether sentinel is present or absent) MUST NOT be reported as
+   passing verification.  It MUST be reported as FAIL or UNSTAMPED
+   with a clear message indicating the absent digest.
+
+   The correct and only acceptable message for this condition is a
+   failure message.  No "unverifiable -- assumed OK" path is permitted.
+
+7.3.  Legacy Colon Separator
+
+   Some existing Crowsong corpus files use a colon separator in header
+   fields rather than the canonical double-space separator:
+
+      # SHA256:    3a7f91c2...    (legacy)
+      # SHA256     3a7f91c2...    (canonical)
+
+   Implementations MAY accept the colon separator during parsing.
+   When doing so, the colon-separator path MUST be restricted to the
+   set of known field names defined in Section 3.  Lines whose field
+   name (the text before the colon) is not in the known field set MUST
+   NOT be parsed as metadata fields.
+
+   Rationale: Unrestricted colon parsing would misinterpret URLs and
+   freeform comment text as metadata fields.
+
+   Implementations MUST emit only the canonical double-space separator
+   when writing new CAHF files.
+
+8.  Conformance Requirements for Tool Implementors
+
+8.1.  Stamping Conformance
+
+   A conformant CAHF stamper MUST:
+
+      *  Emit "# ARCHIVIST  v1.0" as the first line of the header.
+      *  Emit the sentinel "# ---END-HEADER---" on its own line,
+         with no additional blank line between sentinel and body.
+      *  Compute SHA256 per Section 4.3 using the normalised,
+         trailing-newline-stripped body.
+      *  Emit SHA256 as lowercase hex in the SHA256 header field.
+      *  Write the body followed by exactly one trailing LF.
+      *  Normalise CRLF to LF in the stored file.
+
+8.2.  Verification Conformance
+
+   A conformant CAHF verifier MUST:
+
+      *  Gate on "# ARCHIVIST" as the first non-empty line.
+      *  Require the sentinel line.  Files lacking the sentinel MUST
+         NOT be reported as PASS.
+      *  Require a SHA256 field.  Files lacking SHA256 MUST NOT be
+         reported as PASS.
+      *  Extract the body by splitting at the sentinel and stripping
+         the trailing newline per Section 4.4(c).
+      *  Compute SHA256 identically to the stamper.
+      *  Report both declared and actual digests on FAIL.
+      *  Exit with a non-zero exit code on FAIL.
+
+8.3.  Independence Requirement
+
+   Each Crowsong tool that produces or consumes CAHF files MUST
+   implement the CAHF stamping and verification logic locally.
+   Importing archivist.py is NOT REQUIRED and NOT RECOMMENDED.
+
+   The specification (this document) is the shared contract.  The
+   implementation is the tool's own responsibility.
+
+   Tools that implement a subset of optional fields (e.g., cmudict.py
+   using SOURCE, ENTRIES, and SHA256 but not TITLE or AUTHOR) are
+   conformant provided they:
+
+      a.  Emit a correct ARCHIVIST marker and SHA256 field.
+      b.  Emit the sentinel line correctly.
+      c.  Implement verification faithfully per Section 6.
+
+   Such tools SHOULD document their field subset in their own README,
+   citing this specification.
+
+9.  Security Considerations
+
+9.1.  Integrity vs. Authenticity
+
+   CAHF provides content integrity checking, not cryptographic
+   authenticity.  The SHA256 in the header proves that the current body
+   matches the declared digest.  It does not prove:
+
+      *  Who created the document.
+      *  That the header itself has not been replaced along with
+         a recomputed SHA256.
+      *  That the source from which the body was fetched was legitimate.
+
+   For authenticity and non-repudiation, an external signing mechanism
+   (e.g., Ed25519 per [RFC8032] or GPG per [RFC4880]) MUST be layered
+   on top of the CAHF file.  The FDS Print Profile [FDS] defines such
+   a mechanism for physical-media artifacts.
+
+9.2.  First-Fetch Trust
+
+   For tools that fetch remote content and stamp it with CAHF (e.g.,
+   corpus mirrors), the SHA256 pinned in the header is only as
+   trustworthy as the first fetch.  If the first fetch is intercepted:
+
+      *  The attacker controls both the body and the SHA256 written to
+         the header.
+      *  Subsequent local verification passes against the
+         attacker-controlled hash.
+
+   Mitigations:
+
+      *  Fetch MUST use HTTPS-only sources.  Plain HTTP sources MUST
+         NOT be used as primary or fallback sources for any tool that
+         pins a CAHF SHA256.  (See tools/cmudict/cmudict.py for a
+         conformant example of this rule.)
+
+      *  Where available, implementations SHOULD verify the fetched
+         body against an independently-pinned expected digest before
+         writing the CAHF file.
+
+      *  For corpus files with stable expected content, a known-good
+         digest MAY be committed to the repository and checked at
+         fetch time.
+
+9.3.  Unverified Cache Use
+
+   Tools that read CAHF-stamped cached files SHOULD verify the SHA256
+   before using the body for any downstream operation.  Loading and
+   parsing a cached file without verification defeats the purpose of
+   the CAHF header.
+
+   Implementations SHOULD provide a verified load path that refuses to
+   return body content if SHA256 verification fails.  An unverified
+   load path MAY be provided but MUST be explicitly invoked and MUST
+   NOT be the default.
+
+   This requirement reflects the Crowsong operating assumption: cached
+   content may have been tampered with, and the SHA256 check is the
+   only local guard.
+
+10. IANA Considerations
+
+   This document has no IANA actions.  CAHF is an internal convention
+   of the Crowsong Suite and does not request registration of any media
+   types, URIs, or protocol parameters.
+
+11. References
+
+11.1. Normative References
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119, March 1997.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, May 2017.
+
+11.2. Informative References
+
+   [RFC8032]  Josefsson, S. and I. Liusvaara, "Edwards-Curve Digital
+              Signature Algorithm (EdDSA)", RFC 8032, January 2017.
+
+   [RFC4880]  Callas, J. et al., "OpenPGP Message Format", RFC 4880,
+              November 2007.
+
+   [CROWSONG]  Darley, T., "The Crowsong Suite", draft-darley-
+              crowsong-00, work in progress.
+
+   [FDS]      Darley, T., "Fox Decimal Script (FDS)", draft-darley-
+              fds-00, 1 April 2026.
+
+   [ARCHIVIST]  Darley, T., "archivist.py -- Self-describing document
+              framing tool", MIT License, 2026.
+              https://github.com/propertools/crowsong
+
+12. Acknowledgements
+
+   The Crowsong archivist format pattern -- self-describing headers,
+   SHA256 over body only, append-safe metadata -- emerged from the
+   shared conventions of tools/texts/texts.py and tools/udhr/udhr.py
+   before it was named.  This document formalises what those tools
+   already understood.
+
+13. Author's Address
+
+   Trey Darley
+   Proper Tools SRL
+   Brussels, Belgium
+
+   Email: trey@propertools.be
+   URI:   https://propertools.be
+
+Appendix A.  Canonical Examples
+
+A.1.  Minimal Stamped File
+
+   The smallest valid CAHF file consists of the ARCHIVIST marker, a
+   SHA256 field, the sentinel, and an empty body.
+
+   The SHA256 of an empty body is the well-known constant:
+
+      e3b0c44298fc1c149afbf4c8996fb924
+      27ae41e4649b934ca495991b7852b855
+
+   Minimal valid CAHF file:
+
+      # ARCHIVIST  v1.0
+      # SHA256    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      # ---END-HEADER---
+
+   (trailing newline follows the sentinel; body is empty)
+
+   This file MUST pass verification.  The SHA256 of the empty body is
+   well-defined and invariant; implementations SHOULD include it in
+   their test suites.
+
+A.2.  Full Corpus File (cmudict.dict pattern)
+
+   The following is a conformant CAHF header for a corpus mirror file:
+
+      # ARCHIVIST  v1.0
+      #
+      # TITLE     CMU Pronouncing Dictionary
+      # SOURCE    https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict
+      # FETCHED   2026-04-06
+      # ENTRIES   134,373
+      # LICENSE   Public domain (Carnegie Mellon University)
+      # TOOL      tools/cmudict/cmudict.py
+      #
+      # CHARS     7,432,891
+      # LINES     134,373
+      # SHA256    <lowercase hex SHA256 of normalised body>
+      # ---END-HEADER---
+      A  EY1
+      A(2)  EY1
+      ...
+
+   Notes:
+      *  FETCHED is used instead of DATE for corpus mirror files to
+         distinguish the fetch date from a document creation date.
+      *  ENTRIES records the number of parsed dictionary entries.
+      *  CHARS and LINES are computed over the normalised body.
+      *  The sentinel follows immediately after the last header line.
+
+A.3.  General Document (archivist.py pattern)
+
+   The following is a conformant CAHF header for a general document,
+   as produced by tools/archivist/archivist.py:
+
+      # ARCHIVIST  v1.0
+      # TITLE     Universal Declaration of Human Rights -- Arabic
+      # AUTHOR    OHCHR
+      # LANG      ar
+      # SOURCE    https://www.ohchr.org/
+      # DATE      2026-04-06
+      # TLP       CLEAR
+      # CHARS     14,732
+      # LINES     312
+      # SHA256    3a7f91c2b04e8d6f1a2b3c4d5e6f7890...
+      # ---END-HEADER---
+      [document body]
+
+   The sentinel terminates the header; the body begins on the
+   immediately following line.
+
+Appendix B.  Known SHA256 Constants
+
+   The following SHA256 values are invariant and SHOULD be used as
+   test vectors in conformance test suites.
+
+      Input          SHA256
+      -----          ------
+      (empty string) e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      "hello\n"      (strip trailing newline -> "hello")
+                     2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+      "hello"        2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+
+   Note: "hello\n" and "hello" produce the same digest because
+   trailing newlines are stripped before hashing (Section 4.2).
+   This is the expected and correct behaviour.
+
+Appendix C.  Conformance Checklist
+
+   This checklist is provided as a convenience for implementors.  It
+   does not replace the normative text of the specification.
+
+   Stamping:
+
+      [ ] First header line is "# ARCHIVIST  v1.0"
+      [ ] SHA256 is computed over normalised, trailing-newline-stripped body
+      [ ] SHA256 is emitted as lowercase hex, exactly 64 characters
+      [ ] Sentinel line is "# ---END-HEADER---" with no trailing spaces
+      [ ] No blank line between sentinel and body
+      [ ] Body is followed by exactly one LF
+      [ ] File is written with LF line endings throughout
+      [ ] File is UTF-8 encoded
+
+   Verification:
+
+      [ ] Gates on "# ARCHIVIST" as first non-empty line
+      [ ] Requires sentinel; files without sentinel reported as legacy
+      [ ] Requires SHA256 field; files without SHA256 reported as FAIL
+      [ ] Extracts body by splitting at sentinel
+      [ ] Strips trailing newline before hashing
+      [ ] Reports both declared and actual SHA256 on FAIL
+      [ ] Returns non-zero exit code on FAIL
+      [ ] Does not report PASS for unstamped, legacy, or damaged files
+
+   Cross-tool interoperability:
+
+      [ ] A file stamped by this tool verifies correctly under
+          tools/archivist/archivist.py verify
+      [ ] A file stamped by tools/archivist/archivist.py verifies
+          correctly under this tool
