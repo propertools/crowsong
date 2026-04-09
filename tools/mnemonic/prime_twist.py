@@ -746,7 +746,7 @@ def build_parser():
         "unstack",
         help="unwind all passes in a stack file; emit bare token stream"
     )
-    p_unstack.add_argument("infile", help="stack file")
+    p_unstack.add_argument("infile", help="stack file (use - for stdin)")
 
     return parser
 
@@ -904,12 +904,15 @@ def cmd_stack(args):
 
 
 def cmd_unstack(args):
-    try:
-        with io.open(args.infile, "r", encoding="utf-8") as f:
-            content = f.read()
-    except IOError as err:
-        print("Error: {0}".format(err), file=sys.stderr)
-        return 1
+    if args.infile == "-":
+        content = _read_stdin()
+    else:
+        try:
+            with io.open(args.infile, "r", encoding="utf-8") as f:
+                content = f.read()
+        except IOError as err:
+            print("Error: {0}".format(err), file=sys.stderr)
+            return 1
 
     artifacts = parse_stack_file(content)
     if not artifacts:
