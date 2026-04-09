@@ -1436,10 +1436,10 @@ through `prime_twist.py unstack -` first.”
 |Field   |Value     |
 |--------|----------|
 |Severity|high      |
-|Status  |open      |
+|Status  |closed    |
 |Claimed |—         |
 |Opened  |2026-04-06|
-|Closed  |—         |
+|Closed  |2026-04-09|
 |Commit  |—         |
 
 **Description:** `prime_twist.py unstack` requires a file path argument.
@@ -1447,7 +1447,12 @@ It cannot read from stdin, so it cannot participate in a pipeline without
 a temporary file. This breaks the composability contract. Pattern already
 used correctly in `archivist.py` and `ucs_dec_tool.py`.
 
-**Fix:**
+**Fix:** `cmd_unstack` now treats `infile == "-"` as stdin via
+`_read_stdin()`, falling through to file open otherwise. Argparse help
+text updated to `"stack file (use - for stdin)"`. Covered by
+`tests/test_prime_twist_unstack_stdin.py` (8 tests: in-process command
+tests with stubbed stdin, plus subprocess CLI tests including a
+`stack | unstack -` pipeline roundtrip).
 
 ```python
 # In cmd_unstack():
@@ -1457,9 +1462,6 @@ else:
     with io.open(args.infile, "r", encoding="utf-8") as f:
         content = f.read()
 ```
-
-Update `infile` argparse definition:
-`help="stack file (use - for stdin)"`
 
 -----
 
