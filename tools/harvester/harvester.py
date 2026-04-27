@@ -423,6 +423,21 @@ def _extract_with_lxml(html_text, container_tag, container_class, strip_rules):
     container = containers[0]
 
     # Strip configured elements (in place).
+    #
+    # NOTE: ``getparent().remove(el)`` drops ``el.tail`` along with the
+    # element. This is correct for block-level strip rules (h1, div.meta,
+    # p.archive-note) where tail text is whitespace. If inline strip rules
+    # are added in future, switch to a tail-preserving removal:
+    #
+    #     parent = el.getparent()
+    #     idx = parent.index(el)
+    #     if el.tail:
+    #         if idx == 0:
+    #             parent.text = (parent.text or "") + el.tail
+    #         else:
+    #             prev = parent[idx - 1]
+    #             prev.tail = (prev.tail or "") + el.tail
+    #     parent.remove(el)
     for strip_tag, strip_class in strip_rules:
         if strip_class:
             strip_xpath = ".//{}[contains(concat(' ', normalize-space(@class), ' '), ' {} ')]".format(
@@ -664,8 +679,29 @@ def _escape_xml(text):
             .replace("'", "&apos;"))
 
 
+def _cdata(text):
+    """
+    Escape text for safe embedding inside a CDATA section.
+
+    CDATA sections terminate at ``]]>``. If the text contains that sequence,
+    we split it across two CDATA sections so the literal terminator never
+    appears inside one. The result is still embedded in a single
+    ``<![CDATA[...]]>`` wrapper at the call site.
+    """
+    if text is None:
+        return ""
+    return text_type(text).replace("]]>", "]]]]><![CDATA[>")
+
+
 def _rfc822(dt_str):
-    """Format an ISO date string as RFC 822 for RSS pubDate."""
+    """
+    Format an ISO date string as RFC 822 for RSS pubDate.
+
+    Currently assumes UTC. Date-only inputs (``2026-04-27``) are interpreted
+    as midnight UTC. ISO strings with a timezone offset are accepted, but
+    the offset is discarded -- output always carries ``+0000``. Callers
+    that need timezone-aware output must normalise inputs before calling.
+    """
     if not dt_str:
         return ""
     # Try full ISO with timezone.
@@ -849,6 +885,10 @@ def build_feed(harvested_dir, config):
         })
 
     # Sort newest first.
+    # NOTE: this uses lexicographic comparison on the ``published`` field,
+    # which is correct for ISO 8601 dates (YYYY-MM-DD or full RFC 3339)
+    # because the format is designed to sort lexicographically. Human-
+    # readable date formats ("April 27, 2026") would sort incorrectly.
     items.sort(key=lambda i: i["meta"].get("published", ""), reverse=True)
 
     site_url = config.get("feed", "site_url", "")
@@ -918,10 +958,10 @@ def build_feed(harvested_dir, config):
             lines.append("      <author>{}</author>".format(
                 _escape_xml(feed_author)))
         lines.append("      <description><![CDATA[{}]]></description>".format(
-            description))
+            _cdata(description)))
         lines.append("      <content:encoded><![CDATA[")
-        lines.append(item["fragment"])
-        lines.append(archive_footer)
+        lines.append(_cdata(item["fragment"]))
+        lines.append(_cdata(archive_footer))
         lines.append("      ]]></content:encoded>")
         lines.append("    </item>")
         lines.append("")

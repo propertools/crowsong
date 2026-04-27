@@ -52,7 +52,7 @@ def _load_harvester():
         mod = ilu.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
-    except AttributeError:
+    except (ImportError, AttributeError):
         import imp
         return imp.load_source("harvester", target)
 
@@ -579,6 +579,73 @@ class TestConfig(unittest.TestCase):
         self.assertIn(("div", "meta"), rules)
         self.assertIn(("p", "archive-note"), rules)
         self.assertIn(("script", None), rules)
+
+
+# ---------------------------------------------------------------------------
+# CDATA escape (regression: ]]> sequence in fragment terminates CDATA)
+# ---------------------------------------------------------------------------
+
+class TestCDATAEscape(unittest.TestCase):
+
+    def test_plain_text_unchanged(self):
+        self.assertEqual(_mod._cdata("hello world"), "hello world")
+
+    def test_empty_string(self):
+        self.assertEqual(_mod._cdata(""), "")
+
+    def test_none_returns_empty(self):
+        self.assertEqual(_mod._cdata(None), "")
+
+    def test_cdata_terminator_split(self):
+        """The literal sequence ]]> must not appear in escaped output."""
+        escaped = _mod._cdata("evil ]]> here")
+        self.assertNotIn("]]>", escaped.replace("]]]]><![CDATA[>", ""))
+
+    def test_multiple_terminators(self):
+        escaped = _mod._cdata("a ]]> b ]]> c")
+        # Two splits expected; "]]>" appears only as part of the split pattern
+        self.assertEqual(escaped.count("]]]]><![CDATA[>"), 2)
+
+    def test_feed_with_cdata_terminator_in_fragment(self):
+        """End-to-end: a fragment containing ]]> must produce valid RSS."""
+        # Build a minimal config and harvested directory in memory.
+        tmpdir = tempfile.mkdtemp(prefix="harvester-cdata-test-")
+        try:
+            with io.open(os.path.join(tmpdir, "evil.fragment"),
+                         "w", encoding="utf-8") as f:
+                f.write("<p>Nested CDATA: ]]> would break things</p>")
+            with io.open(os.path.join(tmpdir, "evil.meta"),
+                         "w", encoding="utf-8") as f:
+                f.write(
+                    "slug=evil\n"
+                    "title=Test ]]> Title\n"
+                    "description=Description ]]> with terminator\n"
+                    "published=2026-04-27\n"
+                    "canonical_url=https://example.com/evil/\n"
+                )
+
+            cfg_path = os.path.join(tmpdir, "harvester.cfg")
+            with io.open(cfg_path, "w", encoding="utf-8") as f:
+                f.write(
+                    "[feed]\n"
+                    "title = Test\n"
+                    "site_url = https://example.com\n"
+                    "link = https://example.com/\n"
+                    "feed_url = https://example.com/feed.xml\n"
+                )
+            config = _mod.Config(cfg_path)
+            rss = _mod.build_feed(tmpdir, config)
+
+            # Direct assertions on the contract:
+            #   1. The escape pattern is present in the output.
+            #   2. The visible content survives intact.
+            self.assertIn("]]]]><![CDATA[>", rss)
+            self.assertIn("Nested CDATA:", rss)
+            self.assertIn("would break things", rss)
+            self.assertIn("Description", rss)
+            self.assertIn("with terminator", rss)
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
