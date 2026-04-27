@@ -582,6 +582,154 @@ class TestConfig(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Relative URL rewriting (regression: feed readers may not resolve relative)
+# ---------------------------------------------------------------------------
+
+class TestURLRewriting(unittest.TestCase):
+
+    def test_root_relative_href_rewritten(self):
+        result = _mod._rewrite_relative_urls(
+            '<a href="/commons/oath/">link</a>',
+            "https://example.com")
+        self.assertIn('href="https://example.com/commons/oath/"', result)
+
+    def test_root_relative_src_rewritten(self):
+        result = _mod._rewrite_relative_urls(
+            '<img src="/assets/img/logo.png">',
+            "https://example.com")
+        self.assertIn('src="https://example.com/assets/img/logo.png"', result)
+
+    def test_absolute_url_unchanged(self):
+        result = _mod._rewrite_relative_urls(
+            '<a href="https://other.com/page">link</a>',
+            "https://example.com")
+        self.assertIn('href="https://other.com/page"', result)
+
+    def test_protocol_relative_unchanged(self):
+        """``//cdn.example.com/...`` is protocol-relative, not root-relative."""
+        result = _mod._rewrite_relative_urls(
+            '<script src="//cdn.example.com/lib.js"></script>',
+            "https://example.com")
+        self.assertIn('src="//cdn.example.com/lib.js"', result)
+        self.assertNotIn('https://example.com//cdn', result)
+
+    def test_path_relative_unchanged(self):
+        """``../foo`` and ``foo/bar`` are not rewritten (resolution context unknown)."""
+        result = _mod._rewrite_relative_urls(
+            '<a href="../sibling/">link</a>',
+            "https://example.com")
+        self.assertIn('href="../sibling/"', result)
+
+    def test_trailing_slash_in_base_handled(self):
+        """Base with trailing slash should not produce double slashes."""
+        result = _mod._rewrite_relative_urls(
+            '<a href="/path">link</a>',
+            "https://example.com/")
+        self.assertIn('href="https://example.com/path"', result)
+        self.assertNotIn("https://example.com//", result)
+
+    def test_empty_base_passes_through(self):
+        """Empty canonical_base should not modify the fragment."""
+        original = '<a href="/path">link</a>'
+        result = _mod._rewrite_relative_urls(original, "")
+        self.assertEqual(result, original)
+
+    def test_multiple_links_in_one_fragment(self):
+        """All matching links should be rewritten."""
+        result = _mod._rewrite_relative_urls(
+            '<a href="/a">A</a> and <a href="/b">B</a> and <img src="/c.png">',
+            "https://example.com")
+        self.assertIn('href="https://example.com/a"', result)
+        self.assertIn('href="https://example.com/b"', result)
+        self.assertIn('src="https://example.com/c.png"', result)
+
+    def test_single_quoted_href_rewritten(self):
+        """Single-quoted href values are also rewritten."""
+        result = _mod._rewrite_relative_urls(
+            "<a href='/commons/oath/'>link</a>",
+            "https://example.com")
+        self.assertIn("href='https://example.com/commons/oath/'", result)
+
+    def test_single_quoted_src_rewritten(self):
+        """Single-quoted src values are also rewritten."""
+        result = _mod._rewrite_relative_urls(
+            "<img src='/assets/img/logo.png'>",
+            "https://example.com")
+        self.assertIn("src='https://example.com/assets/img/logo.png'", result)
+
+    def test_mixed_quote_styles_in_one_fragment(self):
+        """A fragment with both quote styles must rewrite both correctly."""
+        result = _mod._rewrite_relative_urls(
+            '<a href="/double">D</a> <a href=\'/single\'>S</a>',
+            "https://example.com")
+        self.assertIn('href="https://example.com/double"', result)
+        self.assertIn("href='https://example.com/single'", result)
+
+    def test_quote_style_preserved_per_attribute(self):
+        """The opening quote style is preserved on output (not normalised)."""
+        # Double-quoted input stays double-quoted.
+        result = _mod._rewrite_relative_urls(
+            '<a href="/path">x</a>', "https://example.com")
+        self.assertIn('href="', result)
+        self.assertNotIn("href='", result)
+
+        # Single-quoted input stays single-quoted.
+        result = _mod._rewrite_relative_urls(
+            "<a href='/path'>x</a>", "https://example.com")
+        self.assertIn("href='", result)
+        # Note: the LINK text doesn't contain href=" so the absence test
+        # is straightforward here.
+
+
+# ---------------------------------------------------------------------------
+# Feed TTL
+# ---------------------------------------------------------------------------
+
+class TestFeedTTL(unittest.TestCase):
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix="harvester-ttl-test-")
+        # Create a minimal harvested artefact.
+        with io.open(os.path.join(self.tmpdir, "x.fragment"),
+                     "w", encoding="utf-8") as f:
+            f.write("<p>body</p>")
+        with io.open(os.path.join(self.tmpdir, "x.meta"),
+                     "w", encoding="utf-8") as f:
+            f.write(
+                "slug=x\n"
+                "title=Test\n"
+                "published=2026-04-27\n"
+                "canonical_url=https://example.com/x/\n"
+            )
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _build_feed_with_ttl(self, ttl_value):
+        cfg_path = os.path.join(self.tmpdir, "harvester.cfg")
+        with io.open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(
+                "[feed]\n"
+                "title = Test\n"
+                "site_url = https://example.com\n"
+                "link = https://example.com/\n"
+                "feed_url = https://example.com/feed.xml\n"
+            )
+            if ttl_value is not None:
+                f.write("ttl = {}\n".format(ttl_value))
+        config = _mod.Config(cfg_path)
+        return _mod.build_feed(self.tmpdir, config)
+
+    def test_ttl_emitted_when_configured(self):
+        rss = self._build_feed_with_ttl("1440")
+        self.assertIn("<ttl>1440</ttl>", rss)
+
+    def test_ttl_omitted_when_not_configured(self):
+        rss = self._build_feed_with_ttl(None)
+        self.assertNotIn("<ttl>", rss)
+
+
+# ---------------------------------------------------------------------------
 # CDATA escape (regression: ]]> sequence in fragment terminates CDATA)
 # ---------------------------------------------------------------------------
 

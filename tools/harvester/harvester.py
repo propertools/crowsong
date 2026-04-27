@@ -108,6 +108,35 @@ def _normalise(text):
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
+def _rewrite_relative_urls(fragment, canonical_base):
+    """
+    Rewrite root-relative URLs in HTML attributes to absolute URLs.
+
+    Some feed readers do not resolve relative links against the canonical
+    URL of the feed item. Rewriting ``/path`` to ``https://example.com/path``
+    inside ``content:encoded`` ensures cross-references survive embedding.
+
+    Only root-relative URLs (starting with ``/`` but not ``//``) are
+    rewritten. Protocol-relative (``//cdn.example.com/...``) and absolute
+    (``https://...``) URLs are left alone.
+
+    Operates on ``href`` and ``src`` attributes only. Both double-quoted
+    (``href="/path"``) and single-quoted (``href='/path'``) attribute
+    values are supported. Path-relative URLs (``../foo``, ``foo/bar``)
+    are not rewritten because their resolution depends on the source
+    document's URL, which the harvester does not know at this layer.
+    """
+    if not canonical_base:
+        return fragment
+    # Strip trailing slash from base so we don't produce ``//path``.
+    base = canonical_base.rstrip("/")
+    # Match href=QUOTE/...QUOTE and src=QUOTE/...QUOTE where QUOTE is
+    # either ``"`` or ``'`` (matched consistently via backreference).
+    # The negative lookahead (?!/) excludes protocol-relative URLs.
+    pattern = re.compile(r"""(href|src)=(["'])(/(?!/)[^"']*)\2""")
+    return pattern.sub(r"\1=\2" + base + r"\3\2", fragment)
+
+
 def _read(path_or_dash):
     """Read text (unicode) from a file path or '-' for stdin."""
     if path_or_dash == "-" or path_or_dash is None:
@@ -643,8 +672,9 @@ def render_meta_sidecar(meta):
         value = meta[key]
         if value is None or value == "":
             continue
-        # Multi-line values get folded with continuation indent.
-        value = _normalise(text_type(value)).replace("\n", "\n    ")
+        # _to_text() handles Py2 unicode coercion safely; multi-line
+        # values are folded with a four-space continuation indent.
+        value = _normalise(_to_text(value)).replace("\n", "\n    ")
         lines.append("{}={}".format(key, value))
     return "\n".join(lines) + "\n"
 
@@ -823,6 +853,11 @@ def harvest_one(html_path, slug, config, output_dir, dry_run=False):
     canonical_base = config.get("output", "canonical_base", "")
     canonical_css = config.get("output", "canonical_css",
                                canonical_base + "/assets/css/main.css")
+    # site_base is used to rewrite root-relative URLs (/path) to absolute
+    # in the emitted fragment. Defaults to the feed's site_url so most
+    # configs do not need to set it explicitly.
+    site_base = config.get("output", "site_base",
+                           config.get("feed", "site_url", ""))
 
     # Extract metadata.
     md = extract_metadata(raw, h1_container_tag, h1_container_class)
@@ -839,6 +874,9 @@ def harvest_one(html_path, slug, config, output_dir, dry_run=False):
     # Extract body fragment.
     fragment = extract_fragment(raw, container_tag, container_class,
                                 strip_rules)
+    # Rewrite root-relative URLs to absolute, so cross-references survive
+    # embedding in feed readers that don't resolve relative URLs.
+    fragment = _rewrite_relative_urls(fragment, site_base)
 
     # Render plain text and standalone.
     text = render_text(fragment)
@@ -901,6 +939,7 @@ def build_feed(harvested_dir, config):
     feed_editor = config.get("feed", "editor", "")
     feed_author = config.get("feed", "author", feed_editor)
     feed_image = config.get("feed", "image", "")
+    feed_ttl = config.get("feed", "ttl", "")
     archive_footer_template = config.get("feed", "archive_footer",
         '<hr><p><em>Canonical archive version: '
         '<a href="{url}">{url_short}</a></em></p>')
@@ -927,6 +966,8 @@ def build_feed(harvested_dir, config):
         lines.append("    <managingEditor>{}</managingEditor>".format(
             _escape_xml(feed_editor)))
     lines.append("    <lastBuildDate>{}</lastBuildDate>".format(last_build))
+    if feed_ttl:
+        lines.append("    <ttl>{}</ttl>".format(_escape_xml(feed_ttl)))
     if feed_image:
         lines.append("    <image>")
         lines.append("      <url>{}</url>".format(_escape_xml(feed_image)))
@@ -1001,12 +1042,13 @@ def cmd_walk(args):
         slug = derive_slug(html_path, args.input_dir)
         if not args.quiet:
             print("  harvesting {} -> {}".format(
-                os.path.relpath(html_path), slug), file=sys.stderr)
+                _label(html_path), slug), file=sys.stderr)
         try:
             harvest_one(html_path, slug, config, args.output_dir,
                         dry_run=args.dry_run)
         except (IOError, OSError) as err:
-            print("  ERROR  {} - {}".format(html_path, err), file=sys.stderr)
+            print("  ERROR  {} - {}".format(_label(html_path), err),
+                  file=sys.stderr)
             errors += 1
 
     if not args.quiet:
@@ -1019,6 +1061,17 @@ def cmd_walk(args):
 
 
 def cmd_extract(args):
+    """
+    Render a single HTML file to canonical plain text on stdout.
+
+    NOTE: relative URLs are NOT rewritten by this command. The rewriter
+    is applied only in the ``walk`` path, where output fragments are
+    embedded in feed readers that may not resolve relative links. The
+    ``extract`` command emits canonical plain text via ``render_text()``,
+    which strips all HTML attributes including URLs, so rewriting would
+    be a no-op. If a future variant of ``extract`` emits HTML fragments
+    instead of plain text, URL rewriting must be applied there as well.
+    """
     config = Config(args.config)
     container_tag = config.get("extractor", "container_tag", "article")
     container_class = config.get("extractor", "container_class", None)
