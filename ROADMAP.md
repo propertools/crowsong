@@ -600,6 +600,139 @@ in resource fork spec (`fds-01`). Tool implementation mid-horizon.
 
 ---
 
+## Crawler — design note (target: future draft)
+
+**Target:** `tools/crawler/crawler.py`
+
+The crawler is the remote-walk counterpart to `harvester`. Where harvester
+walks a local directory tree of HTML files and produces canonical artefacts,
+crawler walks a remote URL and produces a local directory tree that
+harvester can then process.
+
+**The composition:**
+
+```
+crawler  → local mirror of canonical bodies → harvester → feed / archivist
+```
+
+Each stage is independently runnable, independently testable, and shares
+the helper module with the rest of the toolchain (`_to_text`, `_normalise`,
+`_stdout_write_utf8`, `_read`, `_label`, `_line_count`).
+
+### Functional requirement
+
+```
+crawler.py fetch <url> --into <local-dir> [--depth N] [--config <file>]
+crawler.py status <local-dir>
+crawler.py refresh <local-dir>
+```
+
+Walks a site or document tree, fetches HTML, applies canonicalisation,
+stores results in a directory structure that mirrors the source path
+hierarchy. Subsequent runs detect changes via SHA256 of canonicalised
+content and update only what has changed.
+
+### Crowsong design constraints
+
+- Stdlib HTTP fetcher first; allow `requests` if available, fall back
+  to `urllib`. No mandatory external dependencies.
+- Allow `lxml` if available for malformed HTML; fall back to
+  `HTMLParser`. Same dependency-tier pattern as harvester.
+- Idempotent: re-running the crawler produces the same local tree
+  given the same remote source.
+- Conservative bandwidth use: respect `Last-Modified`, `ETag`, and
+  conditional requests; default rate limit of one request per second.
+- Respect `robots.txt` by default. `--ignore-robots` requires an
+  explicit flag.
+- All cached artefacts archivist-stampable. The local mirror is itself
+  a verifiable corpus.
+
+### Failure modes worth anticipating
+
+Network failures (timeouts, DNS, TLS), rate-limiting (429 responses),
+content negotiation (server returns different content based on
+User-Agent or Accept headers), redirects (especially redirect chains
+that wander cross-domain), pagination, dynamically loaded content
+(JavaScript-rendered pages — explicitly out of scope), authentication
+walls, and content that changes between fetches. The crawler should
+fail visibly and recoverably rather than silently and partially.
+
+### Asset and media archival — deferred
+
+A complete remote archive must capture not only HTML body content but
+also images, stylesheets, fonts, embedded media, and PDFs referenced
+by the page. The current harvester defers this entirely: it strips
+asset references and assumes the canonical site remains reachable.
+The crawler will need a richer model:
+
+- Asset discovery: parse the HTML and extract all referenced asset
+  URLs (`<img src>`, `<link href>`, `<script src>`, CSS `url(...)`,
+  inline `style` attribute references).
+- Asset rewriting: rewrite absolute and root-relative URLs to local
+  relative paths so the archived copy renders standalone.
+- Asset deduplication: many pages share assets (a logo, a stylesheet);
+  the crawler should fetch each unique asset once and reference it
+  from multiple pages.
+- Asset versioning: when an asset changes upstream, store the new
+  version alongside the old, addressed by content hash (per the
+  Vesper Archive Protocol's content-addressable identity model).
+- Asset stamping: each asset becomes an archivist-stampable artefact
+  with its own SHA256 in the header. The crawler emits a manifest
+  mapping pages to assets, and a parallel manifest for the assets
+  themselves.
+
+This is a meaningful amount of work and deserves its own design pass.
+The harvester's current behaviour — strip asset references and assume
+the canonical site is reachable — is a deliberate scope limitation,
+not an oversight. The crawler is where this gets solved properly.
+
+### CSS preservation — pattern worth recording
+
+Three tiers of styling preservation, applicable to any archived HTML:
+
+1. **Live-canonical.** Browser visiting the canonical URL gets full
+   styling from the canonical CSS. No harvester involvement.
+
+2. **Standalone-archived.** Harvester emits a `<slug>.standalone`
+   file with a tiny embedded CSS fallback plus an absolute reference
+   to the canonical CSS. Renders well when canonical site is up;
+   degrades to plain readable text when it isn't.
+
+3. **Fragment-embedded.** Harvester emits a `<slug>.fragment` file
+   with no CSS at all. Embedded in RSS `content:encoded`. Rendered
+   by the feed reader's stylesheet. Maximum portability, minimum
+   visual fidelity.
+
+The crawler extends this to a fourth tier: **mirror-archived.** A
+complete local mirror with all assets fetched, hashed, deduplicated,
+and rewritten to relative paths. Renders identically to canonical
+even when canonical site is dark. This is the Vesper Archive Protocol
+target. Deferred to crawler design.
+
+### Relationship to Vesper Archive Protocol
+
+The crawler's local mirror is a candidate input to the Vesper Archive
+Protocol's `tools/archive/package.py`. A site mirrored by the crawler
+becomes an archival capsule via Vesper. The composition is:
+
+```
+remote site  → crawler  → local mirror  → harvester  → canonical artefacts
+                                       → vesper     → archival capsule
+```
+
+Each stage is independently archivist-stampable. Each stage produces
+verifiable output that can be transmitted, mirrored, or sealed
+independently of the others.
+
+### Status
+
+Design intent recorded. No implementation. The harvester ships first
+as the local-walk tool. The crawler is a future deliverable that
+extends the same patterns to remote sources, with asset archival as
+the substantial new work.
+
+---
+
 ## Far horizon — future drafts
 
 **Theme: extensibility.** Design what the system will need to become.
