@@ -1,7 +1,7 @@
-# tools/git/ — git bundle tool for FDS payload packaging
+# tools/git/: git bundle tool for FDS payload packaging
 
 Packages git repositories as self-contained binary bundles for
-transmission over any channel the FDS stack supports — fax, Morse,
+transmission over any channel the FDS stack supports: fax, Morse,
 printed page, photographic microdot, human relay, or TCP/IP.
 
 A git bundle is already content-addressable (commit hashes),
@@ -13,19 +13,19 @@ It is Structural Principles 14 and 15 implemented and battle-tested.
 ## The construction
 
 ```
-git bundle create payload.bundle HEAD
-  → binary blob
-  → WIDTH/3 BINARY UCS-DEC encode
-  → CCL3 (mod3 schedule, optional)
-  → FDS-FRAME  TYPE: git-bundle  REF: <id>
-  → transmit over any channel
+git bundle create payload.bundle --all
+  -> binary blob (all branches, all tags)
+  -> WIDTH/3 BINARY UCS-DEC encode
+  -> CCL3 (mod3 schedule, optional)
+  -> FDS-FRAME  TYPE: git-bundle  REF: <id>
+  -> transmit over any channel
 ```
 
 Receipt:
 
 ```
-FDS decode → CCL unstack → binary blob
-  → git bundle unbundle → full repository
+FDS decode -> CCL unstack -> binary blob
+  -> git bundle unbundle -> full repository
 ```
 
 The receiver gets not just the current content but the full history,
@@ -48,7 +48,7 @@ This is not a hypothetical. It is a concrete capability.
 ## Usage
 
 ```bash
-python gitbundle.py create   [--since HASH] [--repo DIR] <output.bundle>
+python gitbundle.py create   [--since REV] [--repo DIR] <output.bundle>
 python gitbundle.py unbundle <input.bundle> [--into DIR]
 python gitbundle.py verify   <input.bundle>
 python gitbundle.py ls       <input.bundle>
@@ -62,7 +62,7 @@ python gitbundle.py ls       <input.bundle>
 # Bundle the current repo
 python gitbundle.py create payload.bundle
 
-# Bundle only commits since a known hash (delta transmission)
+# Bundle only commits not reachable from a known revision (delta transmission)
 python gitbundle.py create --since abc123f delta.bundle
 
 # Bundle a specific repo directory
@@ -74,7 +74,10 @@ python gitbundle.py verify payload.bundle
 # List refs and prerequisites without unbundling
 python gitbundle.py ls payload.bundle
 
-# Unbundle into a new directory
+# Unbundle into a new directory (uses git clone; creates a full working repo)
+# Note: git clone sets an 'origin' remote pointing to the bundle file path.
+# If the bundle is later moved or deleted, 'git fetch origin' in the
+# recovered repo will fail. Remove or update the remote if needed.
 python gitbundle.py unbundle payload.bundle --into recovered/
 ```
 
@@ -93,6 +96,8 @@ python tools/ucs-dec/ucs_dec_tool.py --encode-binary payload.bundle \
 python tools/ucs-dec/ucs_dec_tool.py --decode-binary payload.txt \
     > payload.bundle
 python gitbundle.py verify payload.bundle
+# Note: --into uses git clone and sets an 'origin' remote pointing to the
+# bundle file path. Move/delete the bundle and 'git fetch origin' will fail.
 python gitbundle.py unbundle payload.bundle --into recovered/
 cd recovered/ && git log --oneline
 ```
@@ -106,15 +111,16 @@ last successful sync:
 
 ```bash
 # Sender: bundle only new commits
-python gitbundle.py create --since <last-known-hash> delta.bundle
+python gitbundle.py create --since <last-known-revision> delta.bundle
 
 # Receiver: apply delta to existing repo
 python gitbundle.py unbundle delta.bundle
 ```
 
 This is Structural Principle 15 (content identity is a hash) applied
-at the repository level. The `--since` hash is the coordination
-mechanism — no external state required.
+at the repository level. The `--since` revision is the coordination
+mechanism; no external state required. Any git revision is accepted
+(commit hash, branch name, tag).
 
 ---
 
@@ -126,15 +132,18 @@ The tool degrades gracefully depending on what is available:
 |---------|--------------|-------|
 | system git | package manager | Preferred; almost always present |
 | dulwich | `pip install dulwich` | Pure Python, MIT licensed, ~800KB |
-| neither | — | Tool fails with a clear message |
+| neither | (none) | Tool fails with a clear message |
 
 The tool detects available backends at startup and reports them
 in `--help` output. No configuration required.
 
 `dulwich` is a pure Python implementation of the git object model
 and bundle format, suitable for environments where system git is
-unavailable. It is an optional dependency — the tool works without it
+unavailable. It is an optional dependency; the tool works without it
 if system git is present.
+
+**dulwich backend limitations:** `create` and `unbundle` require system
+git. `verify` and `ls` work with dulwich alone.
 
 ---
 
@@ -170,7 +179,7 @@ upgrade path.
 Git commit hashes are content-addressable identity. Two repos
 with the same HEAD commit hash are identical by definition.
 Delta transmission (`--since`) requires only the hash of the
-last known state — no external coordination protocol.
+last known state; no external coordination protocol.
 
 ---
 
