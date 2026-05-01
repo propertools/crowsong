@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-sequences.py — OEIS sequence mirror and quick reference tool
+sequences.py - OEIS sequence mirror and quick reference tool
 
 Fetches, caches, and serves terms from a curated subset of the
 On-Line Encyclopedia of Integer Sequences (OEIS).
@@ -26,7 +26,7 @@ Each file is self-describing and human-readable without software.
 Files are suitable for inclusion in the Vesper archive.
 
 OEIS Terms of Use: https://oeis.org/wiki/The_OEIS_End-User_License_Agreement
-Data is used with attribution per OEIS terms. Be polite — the tool
+Data is used with attribution per OEIS terms. Be polite - the tool
 sleeps between requests and identifies itself in the User-Agent.
 
 Compatibility: Python 2.7+ / 3.x
@@ -38,9 +38,11 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import sys
+import tempfile
 import time
 
 PY2 = (sys.version_info[0] == 2)
@@ -145,7 +147,7 @@ SEQUENCES = {
 
 OEIS_BASE     = "https://oeis.org"
 USER_AGENT    = "Crowsong/1.0 (trey@propertools.be; OEIS mirror for offline use)"
-REQUEST_DELAY = 2.0   # seconds between requests — be polite
+REQUEST_DELAY = 2.0   # seconds between requests - be polite
 
 DEFAULT_DIR = os.path.join("docs", "sequences")
 
@@ -160,12 +162,17 @@ def _fetch(url, retries=3):
         try:
             if PY2:
                 response = urlopen(req, timeout=30)
-                body = response.read()
+                try:
+                    body = response.read()
+                finally:
+                    response.close()
                 return body.decode("utf-8", errors="replace")
             else:
                 with urlopen(req, timeout=30) as response:
                     return response.read().decode("utf-8", errors="replace")
         except (URLError, HTTPError) as e:
+            if isinstance(e, HTTPError) and 400 <= e.code < 500 and e.code != 429:
+                raise IOError("HTTP {0} fetching {1}".format(e.code, url))
             last_err = e
             if attempt < retries - 1:
                 time.sleep(REQUEST_DELAY * (attempt + 1))
@@ -188,20 +195,35 @@ def fetch_metadata(seq_id):
     # list directly. Handle both.
     if isinstance(data, list):
         results = data
-    else:
+    elif isinstance(data, dict):
         results = data.get("results") or []
+    else:
+        raise ValueError(
+            "unexpected OEIS API response format for {0}: {1}".format(
+                seq_id, type(data).__name__))
 
     if not results:
         raise ValueError("sequence not found: {0}".format(seq_id))
 
     r = results[0]
+    if not isinstance(r, dict):
+        raise ValueError(
+            "unexpected result element for {0}: {1}".format(seq_id, type(r).__name__))
+    number = r.get("number")
+    if number is None:
+        raise ValueError("OEIS response missing 'number' field for {0}".format(seq_id))
+    try:
+        number = int(number)
+    except (TypeError, ValueError):
+        raise ValueError(
+            "OEIS 'number' field is not an integer for {0}: {1!r}".format(seq_id, number))
     return {
-        "id":          "A{0:06d}".format(r["number"]),
-        "name":        r.get("name", ""),
-        "description": " ".join(r.get("comment", [])),
-        "offset":      r.get("offset", "0"),
-        "keyword":     r.get("keyword", ""),
-        "data":        r.get("data", ""),  # first ~20 terms, comma-separated
+        "id":          "A{0:06d}".format(number),
+        "name":        r.get("name") or "",
+        "description": " ".join(str(c) for c in (r.get("comment") or [])),
+        "offset":      r.get("offset") or "0",
+        "keyword":     r.get("keyword") or "",
+        "data":        r.get("data") or "",  # first ~20 terms, comma-separated
     }
 
 
@@ -211,12 +233,7 @@ def fetch_bfile(seq_id):
 
     Returns a list of (index, term) integer tuples.
     """
-    url = "{0}/{1}/b{2}.txt".format(
-        OEIS_BASE,
-        seq_id,
-        seq_id[1:].lstrip("0") or "0"   # b000796.txt → b796.txt pattern
-    )
-    # OEIS b-file naming: A000796 → b000796.txt
+    # OEIS b-file naming: A000796 -> b000796.txt (6-digit zero-padded, no 'A' prefix)
     url = "{0}/{1}/b{2}.txt".format(OEIS_BASE, seq_id, seq_id[1:])
 
     body = _fetch(url)
@@ -258,17 +275,17 @@ def make_sequence_file(seq_id, metadata, terms, local_meta=None):
     notes = ""
     tags  = ""
     if local_meta:
-        notes = local_meta.get("notes", "")
-        tags  = ", ".join(local_meta.get("tags", []))
+        notes = _oneline(local_meta.get("notes", ""))
+        tags  = _oneline(", ".join(local_meta.get("tags", [])))
 
     lines = [
-        "# {0} — {1}".format(seq_id, metadata["name"]),
+        "# {0} - {1}".format(seq_id, _oneline(metadata.get("name", ""))),
         "#",
         "# OEIS:     https://oeis.org/{0}".format(seq_id),
         "# Fetched:  {0}".format(fetched),
         "# Terms:    {0}".format(term_count),
-        "# Offset:   {0}".format(metadata.get("offset", "")),
-        "# Keywords: {0}".format(metadata.get("keyword", "")),
+        "# Offset:   {0}".format(_oneline(metadata.get("offset", ""))),
+        "# Keywords: {0}".format(_oneline(metadata.get("keyword", ""))),
         "# SHA256:   {0}".format(sha256),
     ]
     if tags:
@@ -277,7 +294,7 @@ def make_sequence_file(seq_id, metadata, terms, local_meta=None):
         lines.append("# Notes:    {0}".format(notes))
     lines += [
         "#",
-        "# Data copyright OEIS Foundation Inc. — https://oeis.org",
+        "# Data copyright OEIS Foundation Inc. - https://oeis.org",
         "# Used with attribution per OEIS End-User License Agreement.",
         "#",
         "",
@@ -292,23 +309,33 @@ def parse_sequence_file(path):
     Parse a cached sequence file. Returns dict with digits, sha256, metadata.
     """
     sha256_declared = None
+    sha256_seen     = False
     seq_id          = None
     term_count      = None
+    term_count_seen = False
     data_line       = None
 
-    with open(path, encoding="utf-8") as f:
+    with io.open(path, "r", encoding="utf-8") as f:
         lines = f.read().splitlines()
 
     for line in lines:
-        if line.startswith("# ") and " — " in line and seq_id is None:
-            seq_id = line.split("# ")[1].split(" — ")[0].strip()
-        if "SHA256:" in line:
-            sha256_declared = line.split("SHA256:")[-1].strip()
-        if "Terms:" in line and ":" in line:
+        # Extract seq_id from title line: "# A000796 - Name"
+        if line.startswith("# A") and seq_id is None:
+            token = line[2:].split()[0]
+            if token.startswith("A") and token[1:].isdigit():
+                seq_id = token
+        # First occurrence wins: a second # SHA256: line (e.g. appended to a
+        # tampered file) must not silently replace the declared hash.
+        if line.startswith("# SHA256:") and not sha256_seen:
+            sha256_seen = True
+            sha256_declared = line.split("SHA256:")[-1].strip() or None
+        if line.startswith("# Terms:") and not term_count_seen:
+            term_count_seen = True
             try:
                 term_count = int(line.split("Terms:")[-1].strip())
             except ValueError:
                 pass
+        # Body: all non-comment non-empty lines; this format has exactly one.
         if line and not line.startswith("#"):
             data_line = line.strip()
 
@@ -325,14 +352,24 @@ def parse_sequence_file(path):
     body = ", ".join(str(t) for t in terms)
     sha256_actual = hashlib.sha256(body.encode("utf-8")).hexdigest()
 
+    if sha256_declared is None:
+        sha256_ok = None
+    else:
+        sha256_ok = (sha256_actual == sha256_declared.lower())
+
     return {
         "seq_id":          seq_id,
         "term_count":      term_count,
         "terms":           terms,
         "sha256_declared": sha256_declared,
         "sha256_actual":   sha256_actual,
-        "sha256_ok":       (sha256_actual == sha256_declared),
+        "sha256_ok":       sha256_ok,
     }
+
+
+def _oneline(value):
+    """Strip carriage returns and newlines from a single-line header value."""
+    return value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
 
 
 # ── Output directory helpers ──────────────────────────────────────────────────
@@ -421,7 +458,7 @@ def build_parser():
     )
     p_sync.add_argument(
         "--all", dest="sync_all", action="store_true",
-        help="sync all sequences in registry, even if cached"
+        help="target all sequences in registry (not just missing ones); combine with --force to re-fetch cached"
     )
     p_sync.add_argument(
         "--force", action="store_true",
@@ -469,12 +506,17 @@ def cmd_show(seq_id, out_dir):
 
     if is_cached(seq_id, out_dir):
         parsed = parse_sequence_file(path)
-        print("Cached: yes ({0} terms)".format(parsed["term_count"] or "?"))
+        n_actual = len(parsed["terms"])
+        print("Cached: yes ({0} terms)".format(n_actual))
         print("SHA256: {0}".format(parsed["sha256_actual"]))
-        print("Valid:  {0}".format("yes" if parsed["sha256_ok"] else "NO — mismatch"))
+        if parsed["sha256_ok"] is None:
+            print("Valid:  (no SHA256 declared in header)")
+        else:
+            print("Valid:  {0}".format("yes" if parsed["sha256_ok"] else "NO - mismatch"))
         if parsed["terms"]:
             preview = ", ".join(str(t) for t in parsed["terms"][:10])
-            print("Terms:  {0} ...".format(preview))
+            ellipsis = " ..." if len(parsed["terms"]) > 10 else ""
+            print("Terms:  {0}{1}".format(preview, ellipsis))
     else:
         print("Cached: no (run: python sequences.py sync {0})".format(seq_id))
 
@@ -491,31 +533,34 @@ def cmd_terms(seq_id, count, out_dir):
 
     parsed = parse_sequence_file(path)
     terms  = parsed["terms"][:count]
-    print("{0} — first {1} terms:".format(seq_id, len(terms)))
+    print("{0} - first {1} terms:".format(seq_id, len(terms)))
     print()
     print(", ".join(str(t) for t in terms))
     return 0
 
 
 def cmd_sync(ids, out_dir, force=False, sync_all=False):
-    if not os.path.exists(out_dir):
+    try:
         os.makedirs(out_dir)
+    except OSError:
+        if not os.path.isdir(out_dir):
+            raise
 
-    if sync_all or not ids:
+    if sync_all:
+        if ids:
+            print("Warning: explicit IDs ignored when --all is used", file=sys.stderr)
+        targets = list(SEQUENCES.keys())
+    elif not ids:
         targets = list(SEQUENCES.keys())
     else:
         targets = [i.upper() for i in ids]
 
     errors = 0
-    for i, seq_id in enumerate(sorted(targets)):
+    for seq_id in sorted(targets):
         path = seq_path(seq_id, out_dir)
 
-        if is_cached(seq_id, out_dir) and not force and not sync_all:
+        if is_cached(seq_id, out_dir) and not force:
             print("  SKIP  {0} (cached; use --force to re-fetch)".format(seq_id))
-            continue
-
-        if sync_all and is_cached(seq_id, out_dir) and not force:
-            print("  SKIP  {0} (cached)".format(seq_id))
             continue
 
         print("  SYNC  {0} ...".format(seq_id), end="")
@@ -529,15 +574,32 @@ def cmd_sync(ids, out_dir, force=False, sync_all=False):
 
             local_meta = SEQUENCES.get(seq_id)
             content    = make_sequence_file(seq_id, metadata, terms, local_meta)
+            time.sleep(REQUEST_DELAY)
 
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            # Atomic write: truncating path directly would leave a corrupt
+            # file if interrupted. Write to a temp file in the same directory
+            # then rename over the destination (POSIX rename is atomic).
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=out_dir, suffix=".tmp")
+            try:
+                with io.open(tmp_fd, "w", encoding="utf-8") as f:
+                    f.write(content)
+                if PY2:
+                    os.rename(tmp_path, path)
+                else:
+                    os.replace(tmp_path, path)
+            except BaseException:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
 
             print(" {0} terms".format(len(terms)))
 
-        except (IOError, ValueError) as err:
+        except (IOError, OSError, ValueError, KeyError) as err:
             print(" FAIL: {0}".format(err))
             errors += 1
+            time.sleep(REQUEST_DELAY)
 
     return 0 if errors == 0 else 1
 
@@ -556,8 +618,9 @@ def cmd_verify(ids, out_dir):
         print("No cached sequences to verify.")
         return 0
 
-    passed = 0
-    failed = 0
+    passed  = 0
+    failed  = 0
+    skipped = 0
     for seq_id in targets:
         path = seq_path(seq_id, out_dir)
         if not os.path.isfile(path):
@@ -565,19 +628,45 @@ def cmd_verify(ids, out_dir):
             failed += 1
             continue
 
-        parsed = parse_sequence_file(path)
-        if parsed["sha256_ok"]:
-            print("  PASS  {0} ({1} terms)".format(
-                seq_id, parsed["term_count"] or len(parsed["terms"])))
-            passed += 1
-        else:
-            print("  FAIL  {0} — SHA256 mismatch".format(seq_id))
+        try:
+            parsed = parse_sequence_file(path)
+        except (IOError, OSError, ValueError) as e:
+            print("  FAIL  {0} - could not read: {1}".format(seq_id, e))
+            failed += 1
+            continue
+
+        ok       = True
+        n_actual = len(parsed["terms"])
+
+        if parsed["term_count"] is not None and parsed["term_count"] != n_actual:
+            print("  FAIL  {0} - Terms count mismatch "
+                  "(header: {1}, actual: {2})".format(
+                      seq_id, parsed["term_count"], n_actual))
+            ok = False
+
+        if parsed["sha256_ok"] is None:
+            if ok:
+                print("  SKIP  {0} (no SHA256 declared)".format(seq_id))
+                skipped += 1
+            else:
+                failed += 1
+            continue
+
+        if parsed["sha256_ok"] is False:
+            print("  FAIL  {0} - SHA256 mismatch".format(seq_id))
             print("        declared: {0}".format(parsed["sha256_declared"]))
             print("        actual:   {0}".format(parsed["sha256_actual"]))
+            ok = False
+
+        if ok:
+            print("  PASS  {0} ({1} terms)".format(seq_id, n_actual))
+            passed += 1
+        else:
             failed += 1
 
     print()
-    print("Results: {0} passed, {1} failed".format(passed, failed))
+    print("Results: {0} passed, {1} failed, {2} skipped".format(
+        passed, failed, skipped))
     return 0 if failed == 0 else 1
 
 
@@ -588,25 +677,30 @@ def main():
     args   = parser.parse_args()
     out_dir = args.dir
 
-    if args.command == "list":
-        cmd_list()
-        return 0
+    try:
+        if args.command == "list":
+            cmd_list()
+            return 0
 
-    if args.command == "show":
-        cmd_show(args.id, out_dir)
-        return 0
+        if args.command == "show":
+            cmd_show(args.id, out_dir)
+            return 0
 
-    if args.command == "terms":
-        return cmd_terms(args.id, args.count, out_dir)
+        if args.command == "terms":
+            return cmd_terms(args.id, args.count, out_dir)
 
-    if args.command == "sync":
-        return cmd_sync(
-            args.ids, out_dir,
-            force=args.force,
-            sync_all=args.sync_all)
+        if args.command == "sync":
+            return cmd_sync(
+                args.ids, out_dir,
+                force=args.force,
+                sync_all=args.sync_all)
 
-    if args.command == "verify":
-        return cmd_verify(args.ids, out_dir)
+        if args.command == "verify":
+            return cmd_verify(args.ids, out_dir)
+
+    except (IOError, OSError, ValueError) as err:
+        print("Error: {0}".format(err), file=sys.stderr)
+        return 1
 
     parser.print_help()
     return 1

@@ -1,4 +1,4 @@
-# sequences.py — OEIS sequence mirror and quick reference tool
+# sequences.py - OEIS sequence mirror and quick reference tool
 
 Fetches, caches, and serves terms from a curated subset of the
 On-Line Encyclopedia of Integer Sequences (OEIS), for offline use,
@@ -104,7 +104,7 @@ then run `python sequences.py sync <id>`.
 Cached files are self-describing plain text:
 
 ```
-# A000796 — Decimal expansion of Pi
+# A000796 - Decimal expansion of Pi
 #
 # OEIS:     https://oeis.org/A000796
 # Fetched:  2026-04-04
@@ -115,7 +115,7 @@ Cached files are self-describing plain text:
 # Tags:     constant, iv-source
 # Notes:    3, 1, 4, 1, 5, 9, ... Digits of pi. IV source.
 #
-# Data copyright OEIS Foundation Inc. — https://oeis.org
+# Data copyright OEIS Foundation Inc. - https://oeis.org
 # Used with attribution per OEIS End-User License Agreement.
 #
 
@@ -127,9 +127,10 @@ Verification recomputes and checks against the declared hash.
 
 ## Polite use
 
-The tool sleeps 2 seconds between requests and identifies itself in
-the User-Agent header. OEIS is a free public resource maintained by
-a non-profit. Do not run `sync --all --force` repeatedly.
+The tool sleeps 2 seconds between each HTTP request (metadata fetch,
+b-file fetch, and between sequences) and identifies itself in the
+User-Agent header. OEIS is a free public resource maintained by a
+non-profit. Do not run `sync --all --force` repeatedly.
 
 OEIS data is copyright OEIS Foundation Inc. and used with attribution
 per the OEIS End-User License Agreement:
@@ -141,9 +142,9 @@ Sequences tagged `iv-source` (the constant digit sequences) are the
 OEIS-sourced counterpart to `tools/constants/constants.py`. They serve
 as IV sources for:
 
-- **Channel Camouflage Layer** — transformation schedule derived from
+- **Channel Camouflage Layer**: transformation schedule derived from
   sequence terms at a declared offset
-- **Mnemonic Share Wrapping** — public IV anchor in the 3/3 construction
+- **Mnemonic Share Wrapping**: public IV anchor in the 3/3 construction
 
 Declared in the resource fork header as:
 
@@ -152,7 +153,7 @@ IV: PI · OFFSET/1000 · BASE/10
 ```
 
 The full synced corpus (`docs/sequences/`) is also suitable for
-inclusion in a Vesper archive as a quick-reference library — the
+inclusion in a Vesper archive as a quick-reference library; the
 prime and Fibonacci sequences in particular are useful for Class D
 channel work where a human operator may need to verify values by hand.
 
