@@ -631,20 +631,20 @@ currently implemented and the bijection is planned.
 |Field   |Value     |
 |--------|----------|
 |Severity|low       |
-|Status  |open      |
+|Status  |closed    |
 |Claimed |—         |
 |Opened  |2026-04-06|
-|Closed  |—         |
+|Closed  |2026-05-01|
 |Commit  |—         |
 
 **Description:** `primes.py` implements `is_prime()` and `next_prime()`
 independently of `mnemonic.py`. Witness sets are currently identical.
 Standalone utility design is intentional, but drift risk is real.
 
-**Fix:** Add a comment explicitly noting that the witness set must be
-kept in sync with `mnemonic.py:WITNESSES_SMALL`. Consider a CI check.
-Do not import from `mnemonic.py` — standalone utility should remain
-dependency-free.
+**Fix:** Added comment on `WITNESSES` in `primes.py` explicitly naming
+`mnemonic.py:WITNESSES_SMALL` as the required sync target. Added
+`TestWitnessSync` test that imports `WITNESSES_SMALL` and asserts equality,
+so any drift causes an immediate test failure.
 
 -----
 
@@ -653,18 +653,19 @@ dependency-free.
 |Field   |Value     |
 |--------|----------|
 |Severity|trivial   |
-|Status  |open      |
+|Status  |closed    |
 |Claimed |—         |
 |Opened  |2026-04-06|
-|Closed  |—         |
+|Closed  |2026-05-01|
 |Commit  |—         |
 
 **Description:** README says `primes first 10000` generates “a printed
 quick-reference table.” `generate_first_primes()` yields one prime per
 line — 10,000 unformatted lines. “Table” implies grouped output.
 
-**Fix:** Either add a `--format table` option, or update the README to
-say “list” instead of “table.”
+**Fix:** Updated README examples to reflect one-per-line output. Updated
+archival generation example to use `generate` subcommand with SHA256 header
+instead of piping `first` to a file.
 
 -----
 
@@ -673,18 +674,21 @@ say “list” instead of “table.”
 |Field   |Value     |
 |--------|----------|
 |Severity|low       |
-|Status  |open      |
+|Status  |closed    |
 |Claimed |—         |
 |Opened  |2026-04-06|
-|Closed  |—         |
+|Closed  |2026-05-01|
 |Commit  |—         |
 
 **Description:** `constants.py` includes SHA256 verification for
 generated constant files. `primes.py` has no equivalent. For the Vesper
 archive use case, this is an inconsistency.
 
-**Fix:** Add `python primes.py verify <file>` that recomputes and checks
-a declared SHA256 header if present. Consistent with archivist format.
+**Fix:** Added `generate <count> <outfile>` and `verify <infile>` subcommands.
+`generate` writes a self-describing file with `Count:` and `SHA256:` header
+fields. `verify` recomputes primes from scratch and checks count, SHA256, and
+prime correctness. Files without a header are handled gracefully. Covered by
+`tools/primes/test_primes.py` (`TestCmdGenerate`, `TestCmdVerify` — 12 tests).
 
 -----
 
